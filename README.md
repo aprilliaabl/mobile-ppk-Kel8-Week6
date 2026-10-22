@@ -1,56 +1,98 @@
-# Welcome to your Expo app 👋
+# WEEK 6 SRS
+### Software Requirements Specification — Mobile Practicum Attendance
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Dokumen ini menjelaskan kebutuhan fungsional dan pembagian modul pengembangan aplikasi presensi praktikum pada Week 6.
 
-## Get started
+---
 
-1. Install dependencies
+## 1. Modul Jadwal & Detail Sesi
 
-   ```bash
-   npm install
-   ```
+**Owner:** `Schedule`
 
-2. Start the app
+### Software Requirements Specification (SRS)
 
-   ```bash
-   npx expo start
-   ```
+- **FR-01:** Pemilihan role dan identitas dummy.
+- **FR-02:** Menampilkan daftar jadwal praktikum.
+- **FR-03:** Menampilkan detail sesi praktikum.
 
-In the output, you'll find options to open the app in a
+### Programming Tasks
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- [ ] Halaman pemilihan role dan identitas.
+- [ ] Dashboard jadwal praktikum.
+- [ ] Detail sesi yang mencakup nama, kelas, waktu, dan status.
+- [ ] Tampilan jadwal kosong dan sesi yang belum dibuka.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+**Output:** Alur awal aplikasi yang dapat digunakan oleh kedua role, yaitu praktikan dan asisten.
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## 2. Modul Pengelolaan Sesi & Rekap
 
-```bash
-npm run reset-project
-```
+**Owner:** `Assistant`
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Software Requirements Specification (SRS)
 
-### Other setup steps
+- **FR-04:** Membuka sesi praktikum.
+- **FR-05:** Menutup sesi praktikum.
+- **FR-06:** Menampilkan rekap kehadiran.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+### Programming Tasks
 
-## Learn more
+- [ ] Dashboard asisten.
+- [ ] Tombol buka dan tutup sesi.
+- [ ] Modal konfirmasi tindakan.
+- [ ] Daftar praktikan dummy beserta waktu kehadiran.
+- [ ] Tampilan rekap kosong.
 
-To learn more about developing your project with Expo, look at the following resources:
+**Output:** Seluruh kontrol sesi praktikum dan rekap kehadiran dari sisi asisten.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## 3. Modul Presensi & Riwayat
 
-Join our community of developers creating universal apps.
+**Owner:** `Attendance`
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Software Requirements Specification (SRS)
+
+- **FR-07:** Melakukan presensi.
+- **FR-08:** Menampilkan hasil presensi dan waktu kehadiran.
+- **FR-09:** Menampilkan riwayat presensi praktikan.
+
+### Programming Tasks
+
+- [ ] Halaman presensi praktikan.
+- [ ] Validasi bahwa sesi praktikum sedang terbuka.
+- [ ] Pencegahan presensi ganda pada sesi yang sama.
+- [ ] Feedback berhasil atau gagal menggunakan modal atau pesan.
+- [ ] Riwayat presensi dummy.
+
+**Output:** Alur presensi praktikan dari proses presensi hingga melihat riwayat kehadiran.
+
+---
+
+## 4. Functional Requirements Overview
+
+| ID | Functional Requirement | Module |
+|:---|:---|:---|
+| FR-01 | Pemilihan role dan identitas dummy | Schedule |
+| FR-02 | Menampilkan daftar jadwal praktikum | Schedule |
+| FR-03 | Menampilkan detail sesi praktikum | Schedule |
+| FR-04 | Membuka sesi praktikum | Assistant |
+| FR-05 | Menutup sesi praktikum | Assistant |
+| FR-06 | Menampilkan rekap kehadiran | Assistant |
+| FR-07 | Melakukan presensi | Attendance |
+| FR-08 | Menampilkan hasil dan waktu presensi | Attendance |
+| FR-09 | Menampilkan riwayat presensi | Attendance |
+
+---
+
+## 5. Sprint 1 Goal
+
+Membangun antarmuka dan alur utama aplikasi presensi praktikum yang mencakup pemilihan role, penampilan jadwal, pengelolaan sesi, pencatatan kehadiran, dan riwayat presensi menggunakan data dummy.
+
+---
+
+<p align="center">
+  <b>WEEK 6 — MOBILE PRACTICUM ATTENDANCE</b><br/>
+  React Native · Expo
+</p>
