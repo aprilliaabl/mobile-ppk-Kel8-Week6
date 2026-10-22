@@ -58,13 +58,21 @@ export default function DetailSesiPraktikan() {
       second: '2-digit',
     });
 
-    // Simpan ke in-memory store agar tidak hilang saat keluar halaman
+    const formattedDate = now.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+
+    // Simpan ke in-memory store agar riwayat presensi langsung terupdate (FR-09)
     catatPresensi({
       sesiId: sesi.id,
       namaSesi: sesi.nama,
       kelas: sesi.kelas,
       praktikanId: praktikan.id,
       namaPraktikan: praktikan.nama,
+      tanggal: formattedDate,
       waktuKehadiran: formattedTime,
       status: 'HADIR',
     });
