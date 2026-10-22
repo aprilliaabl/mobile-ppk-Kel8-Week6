@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
@@ -27,29 +28,20 @@ export default function AttendanceScreen() {
     date: 'Kamis, 22 Oktober 2026',
   };
 
-  // 2. State Lokal untuk Interaksi
-  // Sesi default dibuka (bisa diubah via saklar simulasi untuk demo)
-  const [isSessionOpen, setIsSessionOpen] = useState<boolean>(true);
-  
-  // Status apakah praktikan sudah presensi di sesi ini (pencegahan ganda)
+  // 2. State Lokal
+  const [isSessionOpen] = useState<boolean>(true);
   const [hasAttended, setHasAttended] = useState<boolean>(false);
-  
-  // Waktu kehadiran saat presensi berhasil dilakukan
   const [attendedAt, setAttendedAt] = useState<string | null>(null);
 
-  // 3. Handler Submit Presensi (FR-07)
+  // State Modal Feedback (FR-08)
+  const [showModal, setShowModal] = useState<boolean>(false);
+
+  // 3. Handler Submit Presensi (FR-07 & FR-08)
   const handleAttendanceSubmit = () => {
-    // Validasi 1: Jangan proses jika sesi belum dibuka asisten
-    if (!isSessionOpen) {
+    if (!isSessionOpen || hasAttended) {
       return;
     }
 
-    // Validasi 2: Cegah presensi ganda jika sudah pernah submit
-    if (hasAttended) {
-      return;
-    }
-
-    // Catat waktu kehadiran saat ini
     const now = new Date();
     const formattedTime = now.toLocaleTimeString('id-ID', {
       hour: '2-digit',
@@ -59,6 +51,9 @@ export default function AttendanceScreen() {
 
     setHasAttended(true);
     setAttendedAt(formattedTime);
+
+    // Otomatis munculkan Modal Feedback (FR-08)
+    setShowModal(true);
   };
 
   return (
@@ -100,7 +95,6 @@ export default function AttendanceScreen() {
           <ThemedView type="backgroundElement" style={styles.card}>
             <View style={styles.cardHeader}>
               <ThemedText type="subtitle">Sesi Praktikum</ThemedText>
-              {/* Badge Status Sesi */}
               <View
                 style={[
                   styles.statusBadge,
@@ -159,7 +153,6 @@ export default function AttendanceScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Keterangan Status Presensi */}
             <ThemedText type="small" themeColor="textSecondary" style={styles.helperText}>
               {hasAttended
                 ? `Kehadiran berhasil disimpan pada pukul ${attendedAt} WIB.`
@@ -167,9 +160,85 @@ export default function AttendanceScreen() {
                 ? 'Sesi praktikum saat ini belum dibuka oleh asisten.'
                 : 'Silakan tekan tombol di atas untuk mengisi daftar kehadiran.'}
             </ThemedText>
+
+            {/* Tombol Lihat Bukti jika sudah presensi */}
+            {hasAttended && (
+              <TouchableOpacity
+                style={styles.viewResultBtn}
+                onPress={() => setShowModal(true)}
+                activeOpacity={0.7}>
+                <Text style={styles.viewResultBtnText}>Lihat Bukti Kehadiran</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Modal Feedback Hasil Presensi (FR-08) */}
+      <Modal
+        visible={showModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            {/* Header Modal */}
+            <View style={styles.modalHeader}>
+              <View style={styles.successIconBadge}>
+                <Text style={styles.successIconText}>✓</Text>
+              </View>
+              <ThemedText type="subtitle" style={styles.modalTitle}>
+                Presensi Berhasil
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.modalSubtitle}>
+                Data kehadiran Anda telah tercatat ke dalam sistem
+              </ThemedText>
+            </View>
+
+            <View style={styles.modalDivider} />
+
+            {/* Rincian Hasil Presensi (FR-08) */}
+            <View style={styles.detailSection}>
+              <View style={styles.detailRow}>
+                <ThemedText type="small" themeColor="textSecondary">Waktu Kehadiran</ThemedText>
+                <ThemedText type="smallBold" style={styles.highlightTime}>
+                  {attendedAt} WIB
+                </ThemedText>
+              </View>
+
+              <View style={styles.detailRow}>
+                <ThemedText type="small" themeColor="textSecondary">Status</ThemedText>
+                <View style={styles.statusPill}>
+                  <Text style={styles.statusPillText}>HADIR</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailRow}>
+                <ThemedText type="small" themeColor="textSecondary">Praktikan</ThemedText>
+                <ThemedText type="small">{student.name}</ThemedText>
+              </View>
+
+              <View style={styles.detailRow}>
+                <ThemedText type="small" themeColor="textSecondary">NIM</ThemedText>
+                <ThemedText type="small">{student.nim}</ThemedText>
+              </View>
+
+              <View style={styles.detailRow}>
+                <ThemedText type="small" themeColor="textSecondary">Mata Kuliah</ThemedText>
+                <ThemedText type="small">{session.courseName}</ThemedText>
+              </View>
+            </View>
+
+            {/* Tombol Tutup Modal */}
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setShowModal(false)}
+              activeOpacity={0.8}>
+              <Text style={styles.closeBtnText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -274,29 +343,103 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     paddingHorizontal: Spacing.two,
   },
-  demoPanel: {
-    marginTop: Spacing.four,
-    padding: Spacing.three,
-    borderRadius: 12,
-    backgroundColor: 'rgba(150, 150, 150, 0.08)',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(150, 150, 150, 0.25)',
-  },
-  toggleBtn: {
+  viewResultBtn: {
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2563eb',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  viewResultBtnText: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Modal Styling (FR-08)
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.four,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  successIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#dcfce7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  successIconText: {
+    color: '#16a34a',
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalSubtitle: {
+    textAlign: 'center',
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#f3f4f6',
+    marginVertical: Spacing.three,
+  },
+  detailSection: {
+    gap: 10,
+    marginBottom: Spacing.four,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  toggleBtnOpen: {
-    backgroundColor: '#16a34a',
+  highlightTime: {
+    color: '#2563eb',
+    fontSize: 14,
   },
-  toggleBtnClose: {
-    backgroundColor: '#e11d48',
+  statusPill: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  toggleBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
+  statusPillText: {
+    color: '#16a34a',
+    fontSize: 11,
     fontWeight: '700',
+  },
+  closeBtn: {
+    backgroundColor: '#111827',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  closeBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
