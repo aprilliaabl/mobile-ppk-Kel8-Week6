@@ -5,6 +5,7 @@ export default function PraktikanLayout() {
     <Stack screenOptions={{ headerTitleAlign: 'center' }}>
       <Stack.Screen name="beranda" options={{ title: 'Jadwal Praktikum' }} />
       <Stack.Screen name="sesi/[id]" options={{ title: 'Detail Sesi' }} />
+      <Stack.Screen name="riwayat" options={{ title: 'Riwayat Presensi' }} />
     </Stack>
   );
 }

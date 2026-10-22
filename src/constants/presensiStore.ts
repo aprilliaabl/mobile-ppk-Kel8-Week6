@@ -4,12 +4,24 @@ export interface CatatanPresensi {
   kelas: string;
   praktikanId: string;
   namaPraktikan: string;
-  waktuKehadiran: string; // contoh: "12:15:30"
+  tanggal: string; // contoh: "Kamis, 15 Okt 2026"
+  waktuKehadiran: string; // contoh: "08:10:25"
   status: 'HADIR';
 }
 
-// In-memory store: data tetap bertahan meskipun halaman ditutup/pindah rute
-export const presensiStore: CatatanPresensi[] = [];
+// In-memory store: data awal dummy riwayat presensi praktikan
+export const presensiStore: CatatanPresensi[] = [
+  {
+    sesiId: 's-hist-1',
+    namaSesi: 'Praktikum Algoritma & Pemrograman',
+    kelas: 'IF-2B',
+    praktikanId: 'u-2',
+    namaPraktikan: 'Didi',
+    tanggal: 'Kamis, 15 Okt 2026',
+    waktuKehadiran: '08:05:12',
+    status: 'HADIR',
+  },
+];
 
 // Helper untuk menambah catatan presensi
 export function catatPresensi(data: CatatanPresensi) {
@@ -17,7 +29,7 @@ export function catatPresensi(data: CatatanPresensi) {
     (p) => p.sesiId === data.sesiId && p.praktikanId === data.praktikanId
   );
   if (!sudahAda) {
-    presensiStore.unshift(data); // tambahkan paling depan
+    presensiStore.unshift(data); // tambahkan paling depan agar presensi terbaru muncul pertama
   }
 }
 
@@ -26,4 +38,9 @@ export function cekSudahPresensi(sesiId: string, praktikanId: string): CatatanPr
   return presensiStore.find(
     (p) => p.sesiId === sesiId && p.praktikanId === praktikanId
   );
+}
+
+// Helper untuk mengambil seluruh riwayat presensi praktikan tertentu
+export function getRiwayatPraktikan(praktikanId: string): CatatanPresensi[] {
+  return presensiStore.filter((p) => p.praktikanId === praktikanId);
 }
