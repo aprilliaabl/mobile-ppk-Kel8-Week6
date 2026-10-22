@@ -1,7 +1,7 @@
 # WEEK 6 SRS
 ### Software Requirements Specification — Mobile Practicum Attendance
 
-Dokumen ini menjelaskan kebutuhan fungsional dan pembagian modul pengembangan aplikasi presensi praktikum pada Week 6.
+menjelaskan kebutuhan fungsional dan pembagian modul pengembangan aplikasi presensi praktikum.
 
 ---
 
