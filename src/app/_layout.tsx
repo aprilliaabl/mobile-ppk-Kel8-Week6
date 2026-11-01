@@ -1,14 +1,22 @@
+import { Appearance } from 'react-native';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { W } from '../constants/warna';
+
+// Seluruh aplikasi memakai tema hitam yang sama.
+if (typeof Appearance.setColorScheme === 'function') {
+  Appearance.setColorScheme('dark');
+}
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: true }}>
-      {/* Daftarkan halaman utama */}
-      <Stack.Screen name="index" options={{ title: 'Pilih Role' }} />
-      
-      {/* Daftarkan grup folder asisten dan praktikan */}
-      <Stack.Screen name="asisten" options={{ headerShown: false }} />
-      <Stack.Screen name="praktikan" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: W.bg } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="asisten" />
+        <Stack.Screen name="praktikan" />
+      </Stack>
+    </>
   );
 }
