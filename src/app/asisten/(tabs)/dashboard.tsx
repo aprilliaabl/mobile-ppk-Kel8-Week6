@@ -5,10 +5,12 @@ import { HeaderCard, StatBox } from '../../../components/HeaderCard';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { KontrolSesi } from '../../../components/KontrolSesi';
 import { RekapList } from '../../../components/RekapList';
+import { DaftarIzinAsisten } from '../../../components/DaftarIzinAsisten';
 import { EmptyState } from '../../../components/EmptyState';
 import { Button } from '../../../components/Button';
 import { Ikon } from '../../../components/Ikon';
 import { simulasiPresensi, sisaSimulasi, useRekapSesi, useSesiList } from '../../../constants/dummy';
+import { useDaftarIzinAsisten } from '../../../constants/izinStore';
 import { formatJamRentang, formatTanggal, formatWaktu } from '../../../constants/format';
 import { MAX_W, W } from '../../../constants/warna';
 
@@ -33,6 +35,8 @@ export default function DashboardAsisten() {
 
   const sesi = urut.find((s) => s.id === pilihId);
   const rekap = useRekapSesi(sesi?.id, 'asisten');
+  const daftarIzin = useDaftarIzinAsisten(sesi?.id, 'asisten');
+  const izinPending = daftarIzin.filter((i) => i.status === 'pending').length;
 
   if (!sesi) {
     return <EmptyState ikon="kosong" judul="Belum ada jadwal praktikum" deskripsi="Dashboard akan tersedia setelah ada sesi." />;
@@ -157,6 +161,25 @@ export default function DashboardAsisten() {
               </>
             )}
           </View>
+        </View>
+
+        {/* Pengelolaan Pengajuan Izin & Klasifikasi AI (FR-12 & FR-13) */}
+        <View style={styles.card}>
+          <View style={styles.rowTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.judul}>Pengajuan Izin Ketidakhadiran</Text>
+              <Text style={styles.sub}>
+                Tinjau alasan izin praktikan beserta referensi klasifikasi AI untuk sesi ini
+              </Text>
+            </View>
+            <View style={styles.total}>
+              <Text style={styles.totalText}>
+                {izinPending > 0 ? `${izinPending} Pending` : `${daftarIzin.length} Total`}
+              </Text>
+            </View>
+          </View>
+
+          <DaftarIzinAsisten data={daftarIzin} />
         </View>
       </View>
     </ScrollView>

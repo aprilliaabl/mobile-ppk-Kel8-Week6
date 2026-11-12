@@ -76,4 +76,6 @@ export interface PengajuanIzin {
   tanggalPengajuan: string;
   waktuPengajuan: string;
   createdAtIso: string;
+  diprosesOleh?: string;
+  diprosesPada?: string;
 }

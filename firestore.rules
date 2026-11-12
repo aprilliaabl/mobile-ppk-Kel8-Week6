@@ -44,7 +44,7 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // FR-11: Absence permission submission
+    // FR-11, FR-12, FR-13, FR-14: Absence permission submission & assistant approval workflow
     match /izin/{izinId} {
       allow read: if isAsisten() || (isAuthenticated() && resource.data.praktikanId == request.auth.uid);
 
@@ -57,7 +57,15 @@ service cloud.firestore {
         && izinId == request.resource.data.sesiId + '_' + request.auth.uid
         && !exists(/databases/$(database)/documents/izin/$(izinId));
 
-      allow update, delete: if false;
+      // FR-13: Only assistants can approve or reject, and only when current status is 'pending'
+      allow update: if isAsisten()
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['disetujui', 'ditolak']
+        && request.resource.data.praktikanId == resource.data.praktikanId
+        && request.resource.data.sesiId == resource.data.sesiId
+        && request.resource.data.alasan == resource.data.alasan;
+
+      allow delete: if false;
     }
   }
 }
