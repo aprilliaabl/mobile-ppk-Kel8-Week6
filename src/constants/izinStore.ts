@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from 'react';
 import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
+import { klasifikasikanAlasanIzin } from '../ai/absenceClassifier';
+import type { SentimentResult } from '../ai/sentiment';
 import { cekSudahPresensi, formatJamPresensi, formatTanggalPresensi } from './presensiStore';
-import type { PengajuanIzin, Sesi, UserDummy } from './types';
+import type { KlasifikasiAI, PengajuanIzin, Sesi, UserDummy } from './types';
 
 export interface HasilSubmitIzin {
   ok: boolean;
@@ -51,8 +53,9 @@ export async function ajukanIzin(params: {
   sesi: Sesi | undefined;
   praktikan: UserDummy | undefined;
   alasan: string;
+  customClassifier?: (text: string) => SentimentResult;
 }): Promise<HasilSubmitIzin> {
-  const { sesi, praktikan, alasan } = params;
+  const { sesi, praktikan, alasan, customClassifier } = params;
 
   if (!sesi || !sesi.id?.trim()) {
     return { ok: false, error: 'Sesi praktikum tidak valid atau tidak ditemukan.' };
@@ -83,6 +86,24 @@ export async function ajukanIzin(params: {
 
   inFlightIzin.add(docId);
   try {
+    // FR-12: Klasifikasi alasan izin secara otomatis oleh AI dengan fallback aman
+    let klasifikasiAI: KlasifikasiAI;
+    try {
+      klasifikasiAI = klasifikasikanAlasanIzin(alasanBersih, customClassifier);
+    } catch {
+      klasifikasiAI = {
+        label: null,
+        status: 'error',
+        scores: null,
+        scoreType: 'none',
+        experimental: true,
+        kategori: 'PERLU_TINJAUAN',
+        rekomendasi: 'Perlu Tinjauan Manual (AI Tidak Tersedia)',
+        catatanReferensi:
+          'Klasifikasi otomatis mengalami kendala, namun pengajuan izin tetap tersimpan untuk ditinjau asisten.',
+      };
+    }
+
     const now = new Date();
     const record: PengajuanIzin = {
       id: docId,
@@ -93,7 +114,9 @@ export async function ajukanIzin(params: {
       namaPraktikan: praktikan.nama,
       nimPraktikan: praktikan.nim ?? '22/001',
       alasan: alasanBersih,
+      // FR-12: AI tidak pernah menyetujui/menolak otomatis; status selalu 'pending' saat diajukan
       status: 'pending',
+      klasifikasiAI,
       tanggalPengajuan: formatTanggalPresensi(now),
       waktuPengajuan: formatJamPresensi(now),
       createdAtIso: now.toISOString(),

@@ -37,6 +37,30 @@ export interface BarisRekap {
 
 export type StatusIzin = 'pending' | 'disetujui' | 'ditolak';
 
+export type KategoriIzinAI =
+  | 'SAKIT_MEDIS'
+  | 'DARURAT_KELUARGA'
+  | 'AKADEMIK_DISPENSASI'
+  | 'KEPERLUAN_PRIBADI'
+  | 'PERLU_TINJAUAN';
+
+export interface KlasifikasiAI {
+  /** Label asli dari model LinearSVC (src/ai/model-edom.json) */
+  label: 'positif' | 'netral' | 'negatif' | null;
+  /** Status inferensi dari src/ai/sentiment.js */
+  status: 'predicted' | 'unknown_vocabulary' | 'empty_input' | 'error';
+  /** Skor margin keputusan [negatif, netral, positif] */
+  scores: number[] | null;
+  scoreType: string;
+  experimental: boolean;
+  /** Kategori konteks alasan sebagai referensi bagi asisten */
+  kategori: KategoriIzinAI;
+  /** Ringkasan rekomendasi AI (hanya referensi, tidak mengubah status izin) */
+  rekomendasi: string;
+  /** Catatan penjelasan hasil klasifikasi untuk asisten */
+  catatanReferensi: string;
+}
+
 export interface PengajuanIzin {
   /** Deterministic ID: `${sesiId}_${praktikanId}` */
   id: string;
@@ -48,6 +72,7 @@ export interface PengajuanIzin {
   nimPraktikan: string;
   alasan: string;
   status: StatusIzin;
+  klasifikasiAI?: KlasifikasiAI;
   tanggalPengajuan: string;
   waktuPengajuan: string;
   createdAtIso: string;
