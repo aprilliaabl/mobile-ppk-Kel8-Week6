@@ -33,3 +33,6 @@ export interface BarisRekap {
   /** Terlambat jika hadir lebih dari 15 menit setelah sesi dimulai. */
   status: 'TEPAT_WAKTU' | 'TERLAMBAT';
 }
+
+/** Data yang diisi asisten pada form tambah/ubah sesi. */
+export type DataSesi = Pick<Sesi, 'nama' | 'kelas' | 'ruang' | 'waktuMulai' | 'waktuSelesai' | 'jumlahPeserta'>;

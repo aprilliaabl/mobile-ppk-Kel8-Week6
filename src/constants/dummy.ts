@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { BarisRekap, Sesi, StatusSesi, UserDummy } from './types';
+import { BarisRekap, DataSesi, Sesi, StatusSesi, UserDummy } from './types';
 import { presensiStore } from './presensiStore';
 
 export const userDummy: UserDummy[] = [
@@ -122,6 +122,24 @@ export function useSesiList(): Sesi[] {
 
 export function useSesi(id: string | undefined): Sesi | undefined {
   return useSesiList().find((s) => s.id === id);
+}
+
+// CRUD sesi. Dibuat async agar nanti isinya tinggal diganti dengan Firestore tanpa mengubah pemanggil.
+export async function tambahSesi(data: DataSesi): Promise<string> {
+  const id = `s-${Date.now()}`;
+  sesiState = [...sesiState, { id, status: 'belum_dibuka', ...data }];
+  emit();
+  return id;
+}
+
+export async function ubahSesi(id: string, data: Partial<DataSesi>): Promise<void> {
+  sesiState = sesiState.map((s) => (s.id === id ? { ...s, ...data } : s));
+  emit();
+}
+
+export async function hapusSesi(id: string): Promise<void> {
+  sesiState = sesiState.filter((s) => s.id !== id);
+  emit();
 }
 
 export function bukaSesi(id: string, catatan?: string) {
