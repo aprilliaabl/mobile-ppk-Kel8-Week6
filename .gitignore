@@ -10,6 +10,7 @@ web-build/
 expo-env.d.ts
 
 # Native
+google-services.json
 .kotlin/
 *.orig.*
 *.jks
@@ -31,7 +32,10 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+.env.production
+.env.staging
 
 # typescript
 *.tsbuildinfo
