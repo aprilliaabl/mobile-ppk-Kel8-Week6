@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { userDummy } from '../../../constants/dummy';
-import { getRiwayatPraktikan } from '../../../constants/presensiStore';
+import { useRiwayatPraktikan } from '../../../constants/presensiStore';
 import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 import { MAX_W, W } from '../../../constants/warna';
 
@@ -15,7 +15,7 @@ export default function RiwayatPraktikan() {
   useRefreshOnFocus();
 
   const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
-  const riwayat = getRiwayatPraktikan(praktikan.id);
+  const riwayat = useRiwayatPraktikan(praktikan.id);
 
   return (
     <ScrollView

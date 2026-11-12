@@ -21,6 +21,7 @@ export type Role = 'asisten' | 'praktikan';
 export interface UserDummy {
   id: string;
   nama: string;
+  nim?: string;
   role: Role;
 }
 

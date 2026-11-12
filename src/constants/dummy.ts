@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from 'react';
-import { BarisRekap, Sesi, StatusSesi, UserDummy } from './types';
-import { presensiStore } from './presensiStore';
+import type { BarisRekap, Sesi, StatusSesi, UserDummy } from './types';
+import { presensiStore, resetPresensiDemo } from './presensiStore';
 
 export const userDummy: UserDummy[] = [
   { id: 'u-1', nama: 'Dada', role: 'asisten' },
-  { id: 'u-2', nama: 'Didi', role: 'praktikan' },
+  { id: 'u-2', nama: 'Didi', nim: '22/001', role: 'praktikan' },
 ];
 
 /** Waktu dibuat relatif terhadap hari ini supaya label "Hari ini / Besok" selalu relevan. */
@@ -151,7 +151,12 @@ export function getRekapSesi(sesiId: string): BarisRekap[] {
     ...(rekapTambahan[sesiId] ?? []).map((p, i) => ({ id: `sim-${sesiId}-${i}`, ...p })),
     ...presensiStore
       .filter((p) => p.sesiId === sesiId)
-      .map((p, i) => ({ id: `n-${sesiId}-${i}`, nama: p.namaPraktikan, nim: '22/001', waktu: p.waktuKehadiran })),
+      .map((p, i) => ({
+        id: p.id ?? `n-${sesiId}-${i}`,
+        nama: p.namaPraktikan,
+        nim: p.nimPraktikan ?? '22/001',
+        waktu: p.waktuKehadiran,
+      })),
   ];
   return semua.map((p) => ({
     ...p,
@@ -178,7 +183,6 @@ export const sisaSimulasi = (sesiId: string) => POOL_SIMULASI.length - (rekapTam
 export function resetDemo() {
   sesiState = buatSesiAwal();
   Object.keys(rekapTambahan).forEach((k) => delete rekapTambahan[k]);
-  const seed = presensiStore.filter((p) => p.sesiId.startsWith('s-hist'));
-  presensiStore.splice(0, presensiStore.length, ...seed);
+  resetPresensiDemo();
   emit();
 }

@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAsisten() {
+      return isAuthenticated() && getUserRole() == 'asisten';
+    }
+
+    function isPraktikan() {
+      return isAuthenticated() && getUserRole() == 'praktikan';
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    match /sesi/{sesiId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAsisten();
+    }
+
+    // FR-07 & FR-08: Attendance submission and real-time recap
+    match /presensi/{presensiId} {
+      allow read: if isAsisten() || (isAuthenticated() && resource.data.praktikanId == request.auth.uid);
+
+      allow create: if isPraktikan()
+        && request.resource.data.praktikanId == request.auth.uid
+        && request.resource.data.sesiId is string
+        && presensiId == request.resource.data.sesiId + '_' + request.auth.uid
+        && !exists(/databases/$(database)/documents/presensi/$(presensiId))
+        && get(/databases/$(database)/documents/sesi/$(request.resource.data.sesiId)).data.status == 'dibuka'
+        && request.resource.data.status == 'HADIR';
+
+      allow update, delete: if false;
+    }
+  }
+}

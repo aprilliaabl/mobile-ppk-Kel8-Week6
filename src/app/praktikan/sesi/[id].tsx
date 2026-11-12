@@ -12,7 +12,7 @@ import { EmptyState } from '../../../components/EmptyState';
 import { Ikon } from '../../../components/Ikon';
 import { TopBar } from '../../../components/TopBar';
 import { formatJamRentang, formatTanggalPanjang } from '../../../constants/format';
-import { catatPresensi, cekSudahPresensi } from '../../../constants/presensiStore';
+import { submitPresensi, usePresensiPraktikanSesi } from '../../../constants/presensiStore';
 import { MAX_W, W } from '../../../constants/warna';
 
 export default function DetailSesiPraktikan() {
@@ -25,13 +25,15 @@ export default function DetailSesiPraktikan() {
   const sesi = useSesi(id);
   const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
 
-  // Cek apakah sudah pernah presensi di sesi ini (FR-07: tidak boleh dua kali)
-  const existing = sesi ? cekSudahPresensi(sesi.id, praktikan.id) : undefined;
-  const [waktuHadir, setWaktuHadir] = useState<string | null>(existing ? existing.waktuKehadiran : null);
-  const hasAttended = !!waktuHadir;
+  // Cek apakah sudah pernah presensi di sesi ini secara reaktif (FR-07: tidak boleh dua kali)
+  const existing = usePresensiPraktikanSesi(sesi?.id, praktikan.id);
+  const waktuHadir = existing?.waktuKehadiran ?? null;
+  const hasAttended = !!existing;
 
   const [formOpen, setFormOpen] = useState(false);
   const [setuju, setSetuju] = useState(false); // pilihan di form konfirmasi
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false); // umpan balik berhasil (FR-08)
 
   if (!sesi) {
@@ -45,26 +47,19 @@ export default function DetailSesiPraktikan() {
     );
   }
 
-  const handlePresensi = () => {
-    if (sesi.status !== 'dibuka' || hasAttended || !setuju) return;
+  const handlePresensi = async () => {
+    if (!setuju || submitting) return;
+    setErrorMsg(null);
+    setSubmitting(true);
 
-    const now = new Date();
-    const jam = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const tanggal = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+    const hasil = await submitPresensi({ sesi, praktikan });
+    setSubmitting(false);
 
-    // Simpan ke in-memory store agar riwayat presensi langsung ter-update (FR-09)
-    catatPresensi({
-      sesiId: sesi.id,
-      namaSesi: sesi.nama,
-      kelas: sesi.kelas,
-      praktikanId: praktikan.id,
-      namaPraktikan: praktikan.nama,
-      tanggal,
-      waktuKehadiran: jam,
-      status: 'HADIR',
-    });
+    if (!hasil.ok) {
+      setErrorMsg(hasil.error ?? 'Presensi tidak dapat diproses.');
+      return;
+    }
 
-    setWaktuHadir(jam);
     setFormOpen(false);
     setSetuju(false);
     setShowModal(true);
@@ -135,9 +130,9 @@ export default function DetailSesiPraktikan() {
       </View>
 
       {/* Bottom sheet + form konfirmasi presensi */}
-      <BottomSheet visible={formOpen} onClose={() => setFormOpen(false)} title="Konfirmasi presensi">
+      <BottomSheet visible={formOpen} onClose={() => { setFormOpen(false); setErrorMsg(null); }} title="Konfirmasi presensi">
         <View style={styles.summary}>
-          <Text style={styles.sumNama}>{praktikan.nama}</Text>
+          <Text style={styles.sumNama}>{praktikan.nama}{praktikan.nim ? ` (${praktikan.nim})` : ''}</Text>
           <Text style={styles.sumSub}>{sesi.nama} • Kelas {sesi.kelas}</Text>
         </View>
         <Pressable onPress={() => setSetuju((v) => !v)} style={styles.checkRow} accessibilityRole="checkbox" accessibilityState={{ checked: setuju }}>
@@ -146,8 +141,18 @@ export default function DetailSesiPraktikan() {
           </View>
           <Text style={styles.checkText}>Saya hadir dan mengikuti praktikum di {sesi.ruang}.</Text>
         </Pressable>
-        <Button label="Kirim Presensi" variant="success" onPress={handlePresensi} disabled={!setuju} />
-        <Button label="Batal" variant="ghost" onPress={() => setFormOpen(false)} />
+        {!!errorMsg && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        )}
+        <Button
+          label={submitting ? 'Memproses...' : 'Kirim Presensi'}
+          variant="success"
+          onPress={handlePresensi}
+          disabled={!setuju || submitting || sesi.status !== 'dibuka' || hasAttended}
+        />
+        <Button label="Batal" variant="ghost" onPress={() => { setFormOpen(false); setErrorMsg(null); }} />
       </BottomSheet>
 
       {/* Modal umpan balik berhasil (FR-08) */}
@@ -164,7 +169,7 @@ export default function DetailSesiPraktikan() {
             <View style={styles.dRow}><Text style={styles.dLabel}>Praktikum</Text><Text style={styles.dValue}>{sesi.nama}</Text></View>
             <View style={styles.dRow}><Text style={styles.dLabel}>Kelas</Text><Text style={styles.dValue}>{sesi.kelas}</Text></View>
             <Button label="Tutup" variant="success" onPress={() => setShowModal(false)} />
-            <Button label="Lihat riwayat" variant="ghost" onPress={() => { setShowModal(false); router.navigate('/praktikan/riwayat'); }} />
+            <Button label="Lihat riwayat" variant="ghost" onPress={() => { setShowModal(false); router.navigate('/praktikan/riwayat' as never); }} />
           </>
         }
       />
@@ -197,6 +202,8 @@ const styles = StyleSheet.create({
   checkboxOn: { backgroundColor: W.green, borderColor: W.green },
   checkMark: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   checkText: { flex: 1, fontSize: 14, color: W.text, lineHeight: 20 },
+  errorBox: { backgroundColor: W.redSoft, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: W.red },
+  errorText: { color: W.red, fontSize: 13, fontWeight: '600' },
   dRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   dLabel: { fontSize: 13, color: W.sub },
   dValue: { fontSize: 13, color: W.text, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
