@@ -34,3 +34,21 @@ export interface BarisRekap {
   /** Terlambat jika hadir lebih dari 15 menit setelah sesi dimulai. */
   status: 'TEPAT_WAKTU' | 'TERLAMBAT';
 }
+
+export type StatusIzin = 'pending' | 'disetujui' | 'ditolak';
+
+export interface PengajuanIzin {
+  /** Deterministic ID: `${sesiId}_${praktikanId}` */
+  id: string;
+  sesiId: string;
+  namaSesi: string;
+  kelas: string;
+  praktikanId: string;
+  namaPraktikan: string;
+  nimPraktikan: string;
+  alasan: string;
+  status: StatusIzin;
+  tanggalPengajuan: string;
+  waktuPengajuan: string;
+  createdAtIso: string;
+}

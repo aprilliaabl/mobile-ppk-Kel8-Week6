@@ -11,6 +11,7 @@ import {
   resetPresensiDemo,
   subscribePresensi,
 } from './presensiStore';
+import { resetIzinDemo } from './izinStore';
 
 export const userDummy: UserDummy[] = [
   { id: 'u-1', nama: 'Dada', role: 'asisten' },
@@ -259,5 +260,6 @@ export function resetDemo() {
   sesiState = buatSesiAwal();
   Object.keys(rekapTambahan).forEach((k) => delete rekapTambahan[k]);
   resetPresensiDemo();
+  resetIzinDemo();
   emit();
 }

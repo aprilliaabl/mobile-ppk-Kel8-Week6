@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSesi, userDummy } from '../../../constants/dummy';
@@ -13,6 +13,7 @@ import { Ikon } from '../../../components/Ikon';
 import { TopBar } from '../../../components/TopBar';
 import { formatJamRentang, formatTanggalPanjang } from '../../../constants/format';
 import { submitPresensi, usePresensiPraktikanSesi } from '../../../constants/presensiStore';
+import { ajukanIzin, useIzinSesiPraktikan } from '../../../constants/izinStore';
 import { MAX_W, W } from '../../../constants/warna';
 
 export default function DetailSesiPraktikan() {
@@ -30,11 +31,22 @@ export default function DetailSesiPraktikan() {
   const waktuHadir = existing?.waktuKehadiran ?? null;
   const hasAttended = !!existing;
 
+  // Cek apakah sudah pernah mengajukan izin pada sesi ini (FR-11)
+  const existingIzin = useIzinSesiPraktikan(sesi?.id, praktikan.id);
+  const hasRequestedIzin = !!existingIzin;
+
   const [formOpen, setFormOpen] = useState(false);
   const [setuju, setSetuju] = useState(false); // pilihan di form konfirmasi
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false); // umpan balik berhasil (FR-08)
+
+  // State form pengajuan izin (FR-11)
+  const [izinOpen, setIzinOpen] = useState(false);
+  const [alasanIzin, setAlasanIzin] = useState('');
+  const [submittingIzin, setSubmittingIzin] = useState(false);
+  const [errorIzin, setErrorIzin] = useState<string | null>(null);
+  const [showIzinModal, setShowIzinModal] = useState(false);
 
   if (!sesi) {
     return (
@@ -65,6 +77,24 @@ export default function DetailSesiPraktikan() {
     setShowModal(true);
   };
 
+  const handleAjukanIzin = async () => {
+    if (submittingIzin) return;
+    setErrorIzin(null);
+    setSubmittingIzin(true);
+
+    const hasil = await ajukanIzin({ sesi, praktikan, alasan: alasanIzin });
+    setSubmittingIzin(false);
+
+    if (!hasil.ok) {
+      setErrorIzin(hasil.error ?? 'Pengajuan izin tidak dapat diproses.');
+      return;
+    }
+
+    setIzinOpen(false);
+    setAlasanIzin('');
+    setShowIzinModal(true);
+  };
+
   return (
     <View style={styles.root}>
       <TopBar title="Detail Sesi" fallback="/praktikan/beranda" />
@@ -87,6 +117,14 @@ export default function DetailSesiPraktikan() {
               <Ikon nama="centang" size={34} color={W.green} />
               <Text style={[styles.panelTitle, { color: W.green }]}>Presensi sudah tercatat</Text>
               <Text style={styles.panelText}>Kamu hadir pukul {waktuHadir} WIB.</Text>
+            </View>
+          ) : existingIzin ? (
+            <View style={[styles.panel, lebar && { flex: 1 }, styles.panelWarn]}>
+              <Ikon nama="riwayat" size={34} color={W.amber} />
+              <Text style={[styles.panelTitle, { color: W.amber }]}>Pengajuan Izin Terkirim</Text>
+              <Text style={styles.panelText}>
+                Alasan: &quot;{existingIzin.alasan}&quot; ({existingIzin.status.toUpperCase()})
+              </Text>
             </View>
           ) : sesi.status === 'belum_dibuka' ? (
             <View style={[styles.panel, lebar && { flex: 1 }]}>
@@ -118,13 +156,30 @@ export default function DetailSesiPraktikan() {
               <Button label="Sudah Presensi" onPress={() => {}} disabled />
               <Button label="Lihat Bukti Kehadiran" variant="ghost" onPress={() => setShowModal(true)} />
             </>
+          ) : hasRequestedIzin ? (
+            <>
+              <Button label="Izin Sudah Diajukan" onPress={() => {}} disabled />
+              <Button label="Lihat Detail Pengajuan Izin" variant="ghost" onPress={() => setShowIzinModal(true)} />
+            </>
           ) : (
-            <Button
-              label={sesi.status === 'dibuka' ? 'Presensi Sekarang' : sesi.status === 'ditutup' ? 'Sesi Ditutup' : 'Presensi Belum Tersedia'}
-              variant="success"
-              onPress={() => setFormOpen(true)}
-              disabled={sesi.status !== 'dibuka'}
-            />
+            <>
+              <Button
+                label={sesi.status === 'dibuka' ? 'Presensi Sekarang' : sesi.status === 'ditutup' ? 'Sesi Ditutup' : 'Presensi Belum Tersedia'}
+                variant="success"
+                onPress={() => setFormOpen(true)}
+                disabled={sesi.status !== 'dibuka'}
+              />
+              {sesi.status !== 'ditutup' && (
+                <Button
+                  label="Ajukan Izin Ketidakhadiran"
+                  variant="outline"
+                  onPress={() => {
+                    setErrorIzin(null);
+                    setIzinOpen(true);
+                  }}
+                />
+              )}
+            </>
           )}
         </View>
       </View>
@@ -154,6 +209,73 @@ export default function DetailSesiPraktikan() {
         />
         <Button label="Batal" variant="ghost" onPress={() => { setFormOpen(false); setErrorMsg(null); }} />
       </BottomSheet>
+
+      {/* Bottom sheet + form pengajuan izin ketidakhadiran (FR-11) */}
+      <BottomSheet
+        visible={izinOpen}
+        onClose={() => {
+          setIzinOpen(false);
+          setErrorIzin(null);
+        }}
+        title="Ajukan Izin Ketidakhadiran"
+      >
+        <View style={styles.summary}>
+          <Text style={styles.sumNama}>{praktikan.nama}{praktikan.nim ? ` (${praktikan.nim})` : ''}</Text>
+          <Text style={styles.sumSub}>{sesi.nama} • Kelas {sesi.kelas}</Text>
+        </View>
+        <View style={{ gap: 6 }}>
+          <Text style={styles.inputLabel}>Alasan ketidakhadiran</Text>
+          <TextInput
+            value={alasanIzin}
+            onChangeText={(t) => {
+              setAlasanIzin(t);
+              if (errorIzin) setErrorIzin(null);
+            }}
+            placeholder="Contoh: Sakit demam dan harus istirahat sesuai surat dokter"
+            placeholderTextColor={W.sub}
+            style={styles.textArea}
+            multiline
+            maxLength={300}
+          />
+        </View>
+        {!!errorIzin && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{errorIzin}</Text>
+          </View>
+        )}
+        <Button
+          label={submittingIzin ? 'Mengirim...' : 'Kirim Pengajuan Izin'}
+          variant="primary"
+          onPress={handleAjukanIzin}
+          disabled={submittingIzin || hasAttended || hasRequestedIzin}
+        />
+        <Button
+          label="Batal"
+          variant="ghost"
+          onPress={() => {
+            setIzinOpen(false);
+            setErrorIzin(null);
+          }}
+        />
+      </BottomSheet>
+
+      {/* Modal umpan balik pengajuan izin berhasil (FR-11) */}
+      <ConfirmModal
+        visible={showIzinModal}
+        onClose={() => setShowIzinModal(false)}
+        ikon="centang"
+        tone="success"
+        title="Pengajuan Izin Terkirim"
+        message="Permohonan izin ketidakhadiranmu telah disimpan dan menunggu persetujuan asisten."
+        actions={
+          <>
+            <View style={styles.dRow}><Text style={styles.dLabel}>Status</Text><Text style={[styles.dValue, { color: W.amber }]}>{(existingIzin?.status ?? 'pending').toUpperCase()}</Text></View>
+            <View style={styles.dRow}><Text style={styles.dLabel}>Praktikum</Text><Text style={styles.dValue}>{sesi.nama}</Text></View>
+            <View style={styles.dRow}><Text style={styles.dLabel}>Alasan</Text><Text style={styles.dValue}>{existingIzin?.alasan ?? '-'}</Text></View>
+            <Button label="Tutup" variant="primary" onPress={() => setShowIzinModal(false)} />
+          </>
+        }
+      />
 
       {/* Modal umpan balik berhasil (FR-08) */}
       <ConfirmModal
@@ -188,6 +310,7 @@ const styles = StyleSheet.create({
   nama: { flex: 1, fontSize: 20, fontWeight: '800', color: W.text },
   panel: { backgroundColor: W.card, borderRadius: 20, padding: 20, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: W.line },
   panelOk: { backgroundColor: W.greenSoft, borderColor: W.green },
+  panelWarn: { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: W.amber },
   panelBad: { backgroundColor: W.redSoft, borderColor: W.red },
   panelTitle: { fontSize: 16, fontWeight: '800', color: W.text },
   panelText: { fontSize: 13, color: W.sub, textAlign: 'center', lineHeight: 19 },
@@ -204,6 +327,8 @@ const styles = StyleSheet.create({
   checkText: { flex: 1, fontSize: 14, color: W.text, lineHeight: 20 },
   errorBox: { backgroundColor: W.redSoft, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: W.red },
   errorText: { color: W.red, fontSize: 13, fontWeight: '600' },
+  inputLabel: { fontSize: 13, fontWeight: '700', color: W.text },
+  textArea: { minHeight: 88, borderWidth: 1.5, borderColor: W.cardAlt, borderRadius: 12, padding: 12, fontSize: 14, color: W.text, textAlignVertical: 'top', backgroundColor: W.bg },
   dRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   dLabel: { fontSize: 13, color: W.sub },
   dValue: { fontSize: 13, color: W.text, fontWeight: '700', flexShrink: 1, textAlign: 'right' },

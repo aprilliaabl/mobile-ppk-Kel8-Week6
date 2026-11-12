@@ -43,5 +43,21 @@ service cloud.firestore {
 
       allow update, delete: if false;
     }
+
+    // FR-11: Absence permission submission
+    match /izin/{izinId} {
+      allow read: if isAsisten() || (isAuthenticated() && resource.data.praktikanId == request.auth.uid);
+
+      allow create: if isPraktikan()
+        && request.resource.data.praktikanId == request.auth.uid
+        && request.resource.data.sesiId is string
+        && request.resource.data.alasan is string
+        && request.resource.data.alasan.size() > 0
+        && request.resource.data.status == 'pending'
+        && izinId == request.resource.data.sesiId + '_' + request.auth.uid
+        && !exists(/databases/$(database)/documents/izin/$(izinId));
+
+      allow update, delete: if false;
+    }
   }
 }
