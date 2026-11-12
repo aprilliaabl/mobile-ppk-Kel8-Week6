@@ -8,23 +8,56 @@ import { ConfirmModal } from './ConfirmModal';
 import { W } from '../constants/warna';
 
 /**
- * Tombol Buka/Tutup sesi beserta bottom sheet (form catatan) dan modal konfirmasi.
+ * FR-05: tombol Buka/Tutup sesi beserta bottom sheet (form catatan) dan modal konfirmasi.
  * mode "ganda": dua tombol berdampingan (Dashboard). mode "tunggal": hanya tombol yang relevan (halaman detail).
  */
 export function KontrolSesi({ sesi, mode = 'ganda' }: { sesi: Sesi; mode?: 'ganda' | 'tunggal' }) {
   const [bukaOpen, setBukaOpen] = useState(false);
   const [tutupOpen, setTutupOpen] = useState(false);
   const [catatan, setCatatan] = useState('');
+  const [proses, setProses] = useState<'buka' | 'tutup' | null>(null); // mencegah ketukan ganda
+  const [gagal, setGagal] = useState<string | null>(null);
   const jumlahHadir = getRekapSesi(sesi.id).length;
 
-  const konfirmasiBuka = () => {
-    bukaSesi(sesi.id, catatan);
-    setCatatan('');
-    setBukaOpen(false);
+  const pesanError = (e: unknown) =>
+    e instanceof Error ? e.message : 'Terjadi gangguan. Periksa koneksi lalu coba lagi.';
+
+  const mulaiBuka = () => {
+    setGagal(null);
+    setBukaOpen(true);
   };
-  const konfirmasiTutup = () => {
-    tutupSesi(sesi.id);
-    setTutupOpen(false);
+  const mulaiTutup = () => {
+    setGagal(null);
+    setTutupOpen(true);
+  };
+
+  const konfirmasiBuka = async () => {
+    if (proses) return;
+    setProses('buka');
+    setGagal(null);
+    try {
+      await bukaSesi(sesi.id, catatan);
+      setCatatan('');
+      setBukaOpen(false);
+    } catch (e) {
+      setGagal(pesanError(e));
+    } finally {
+      setProses(null);
+    }
+  };
+
+  const konfirmasiTutup = async () => {
+    if (proses) return;
+    setProses('tutup');
+    setGagal(null);
+    try {
+      await tutupSesi(sesi.id);
+      setTutupOpen(false);
+    } catch (e) {
+      setGagal(pesanError(e));
+    } finally {
+      setProses(null);
+    }
   };
 
   const tombolBuka = (
@@ -32,7 +65,7 @@ export function KontrolSesi({ sesi, mode = 'ganda' }: { sesi: Sesi; mode?: 'gand
       <Button
         label={sesi.status === 'dibuka' ? 'Sesi Sedang Dibuka' : 'Buka Sesi'}
         variant="success"
-        onPress={() => setBukaOpen(true)}
+        onPress={mulaiBuka}
         disabled={sesi.status !== 'belum_dibuka'}
       />
     </View>
@@ -42,7 +75,7 @@ export function KontrolSesi({ sesi, mode = 'ganda' }: { sesi: Sesi; mode?: 'gand
       <Button
         label={sesi.status === 'ditutup' ? 'Sesi Telah Ditutup' : 'Tutup Sesi'}
         variant="danger"
-        onPress={() => setTutupOpen(true)}
+        onPress={mulaiTutup}
         disabled={sesi.status !== 'dibuka'}
       />
     </View>
@@ -72,7 +105,8 @@ export function KontrolSesi({ sesi, mode = 'ganda' }: { sesi: Sesi; mode?: 'gand
             maxLength={120}
           />
         </View>
-        <Button label="Ya, buka sesi" variant="success" onPress={konfirmasiBuka} />
+        {!!gagal && <Text style={styles.error}>{gagal}</Text>}
+        <Button label={proses === 'buka' ? 'Membuka...' : 'Ya, buka sesi'} variant="success" onPress={konfirmasiBuka} disabled={proses !== null} />
         <Button label="Batal" variant="ghost" onPress={() => setBukaOpen(false)} />
       </BottomSheet>
 
@@ -82,10 +116,10 @@ export function KontrolSesi({ sesi, mode = 'ganda' }: { sesi: Sesi; mode?: 'gand
         ikon="kunci"
         tone="danger"
         title="Tutup sesi ini?"
-        message={`${jumlahHadir} dari ${sesi.jumlahPeserta} praktikan sudah presensi. Setelah ditutup, praktikan tidak dapat presensi lagi.`}
+        message={gagal ?? `${jumlahHadir} dari ${sesi.jumlahPeserta} praktikan sudah presensi. Setelah ditutup, praktikan tidak dapat presensi lagi.`}
         actions={
           <>
-            <Button label="Ya, tutup sesi" variant="danger" onPress={konfirmasiTutup} />
+            <Button label={proses === 'tutup' ? 'Menutup...' : 'Ya, tutup sesi'} variant="danger" onPress={konfirmasiTutup} disabled={proses !== null} />
             <Button label="Batal" variant="ghost" onPress={() => setTutupOpen(false)} />
           </>
         }
@@ -98,5 +132,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
   desc: { fontSize: 14, color: W.sub, lineHeight: 20, marginTop: -6 },
   label: { fontSize: 13, fontWeight: '700', color: W.text, marginBottom: 6 },
+  error: { fontSize: 13, color: W.red, fontWeight: '600' },
   input: { minHeight: 72, borderWidth: 1.5, borderColor: W.cardAlt, borderRadius: 12, padding: 12, fontSize: 15, color: W.text, textAlignVertical: 'top', backgroundColor: W.bg },
 });
