@@ -8,9 +8,8 @@ import { RekapList } from '../../../components/RekapList';
 import { EmptyState } from '../../../components/EmptyState';
 import { Button } from '../../../components/Button';
 import { Ikon } from '../../../components/Ikon';
-import { getRekapSesi, simulasiPresensi, sisaSimulasi, useSesiList } from '../../../constants/dummy';
+import { simulasiPresensi, sisaSimulasi, useRekapSesi, useSesiList } from '../../../constants/dummy';
 import { formatJamRentang, formatTanggal, formatWaktu } from '../../../constants/format';
-import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 import { MAX_W, W } from '../../../constants/warna';
 
 type FilterRekap = 'SEMUA' | 'TEPAT_WAKTU' | 'TERLAMBAT';
@@ -20,13 +19,12 @@ const FILTERS: { key: FilterRekap; label: string }[] = [
   { key: 'TERLAMBAT', label: 'Terlambat' },
 ];
 
-/** Dashboard Asisten: kontrol sesi (FR-04/05) dan rekap kehadiran (FR-06) untuk satu sesi terpilih. */
+/** Dashboard Asisten: kontrol sesi (FR-04/05) dan rekap kehadiran real-time (FR-08) untuk satu sesi terpilih. */
 export default function DashboardAsisten() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const lebar = width >= 820;
   const sesiList = useSesiList();
-  useRefreshOnFocus();
 
   const urut = useMemo(() => [...sesiList].sort((a, b) => a.waktuMulai.localeCompare(b.waktuMulai)), [sesiList]);
   const [pilihId, setPilihId] = useState<string>(() => (urut.find((s) => s.status === 'dibuka') ?? urut[0])?.id ?? '');
@@ -34,12 +32,11 @@ export default function DashboardAsisten() {
   const [filter, setFilter] = useState<FilterRekap>('SEMUA');
 
   const sesi = urut.find((s) => s.id === pilihId);
+  const rekap = useRekapSesi(sesi?.id, 'asisten');
 
   if (!sesi) {
     return <EmptyState ikon="kosong" judul="Belum ada jadwal praktikum" deskripsi="Dashboard akan tersedia setelah ada sesi." />;
   }
-
-  const rekap = getRekapSesi(sesi.id);
   const tepat = rekap.filter((r) => r.status === 'TEPAT_WAKTU').length;
   const telat = rekap.filter((r) => r.status === 'TERLAMBAT').length;
   const persen = Math.round((rekap.length / sesi.jumlahPeserta) * 100);

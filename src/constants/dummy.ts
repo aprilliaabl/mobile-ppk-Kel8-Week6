@@ -1,6 +1,16 @@
-import { useSyncExternalStore } from 'react';
-import type { BarisRekap, Sesi, StatusSesi, UserDummy } from './types';
-import { presensiStore, resetPresensiDemo } from './presensiStore';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
+import type { BarisRekap, Role, Sesi, StatusSesi, UserDummy } from './types';
+import {
+  buatIdPresensi,
+  type CatatanPresensi,
+  emitPresensi,
+  getPresensiSnapshot,
+  presensiStore,
+  resetPresensiDemo,
+  subscribePresensi,
+} from './presensiStore';
 
 export const userDummy: UserDummy[] = [
   { id: 'u-1', nama: 'Dada', role: 'asisten' },
@@ -105,8 +115,17 @@ function menitDariWaktu(w: string): number {
 
 // ---------- Store sederhana (di memori) supaya perubahan status sesi terlihat di semua layar ----------
 let sesiState: Sesi[] = buatSesiAwal();
+let rekapVersion = 0;
 const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+const emit = () => {
+  rekapVersion += 1;
+  listeners.forEach((l) => l());
+};
+
+// Sinkronkan perubahan presensi secara real-time ke semua subscriber rekap asisten (FR-08)
+subscribePresensi(() => {
+  emit();
+});
 
 function subscribe(l: () => void) {
   listeners.add(l);
@@ -115,6 +134,7 @@ function subscribe(l: () => void) {
   };
 }
 const snapshot = () => sesiState;
+const snapshotVersion = () => rekapVersion;
 
 export function useSesiList(): Sesi[] {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
@@ -140,8 +160,14 @@ export function tutupSesi(id: string) {
   emit();
 }
 
-/** Gabungan rekap dummy + simulasi + presensi yang dilakukan praktikan di aplikasi. */
-export function getRekapSesi(sesiId: string): BarisRekap[] {
+/**
+ * FR-08: Gabungan rekap kehadiran sesi untuk asisten.
+ * Pengguna selain asisten tidak diizinkan mengakses data rekap kehadiran asisten.
+ */
+export function getRekapSesi(sesiId: string, role: Role = 'asisten'): BarisRekap[] {
+  if (role !== 'asisten' || !sesiId) {
+    return [];
+  }
   const sesi = sesiState.find((x) => x.id === sesiId);
   const mulai = sesi ? new Date(sesi.waktuMulai) : new Date();
   const batas = mulai.getHours() * 60 + mulai.getMinutes() + 15;
@@ -162,6 +188,55 @@ export function getRekapSesi(sesiId: string): BarisRekap[] {
     ...p,
     status: menitDariWaktu(p.waktu) <= batas ? 'TEPAT_WAKTU' : 'TERLAMBAT',
   }));
+}
+
+/**
+ * FR-08: Hook real-time untuk memantau rekap kehadiran suatu sesi.
+ * Menggunakan Firestore onSnapshot (jika terkonfigurasi) serta store subscription
+ * sehingga rekap asisten otomatis ter-update saat praktikan submit presensi tanpa refresh manual.
+ */
+export function useRekapSesi(sesiId: string | undefined, role: Role = 'asisten'): BarisRekap[] {
+  const version = useSyncExternalStore(subscribe, snapshotVersion, snapshotVersion);
+  const presensiList = useSyncExternalStore(subscribePresensi, getPresensiSnapshot, getPresensiSnapshot);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || !sesiId || role !== 'asisten') return;
+    const q = query(collection(db, COLLECTIONS.PRESENSI), where('sesiId', '==', sesiId));
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        let changed = false;
+        snap.docChanges().forEach((change) => {
+          if (change.type === 'added' || change.type === 'modified') {
+            const data = change.doc.data() as CatatanPresensi;
+            const docId = change.doc.id || buatIdPresensi(data.sesiId, data.praktikanId);
+            const idx = presensiStore.findIndex(
+              (p) => buatIdPresensi(p.sesiId, p.praktikanId) === docId
+            );
+            if (idx === -1) {
+              presensiStore.unshift({ ...data, id: docId });
+              changed = true;
+            } else {
+              presensiStore[idx] = { ...presensiStore[idx], ...data, id: docId };
+              changed = true;
+            }
+          }
+        });
+        if (changed) emitPresensi();
+      },
+      (err) => {
+        console.warn('[Firestore] Listener rekap sesi error:', err);
+      }
+    );
+    return () => unsubscribe();
+  }, [sesiId, role]);
+
+  return useMemo(() => {
+    void version;
+    void presensiList;
+    if (!sesiId || role !== 'asisten') return [];
+    return getRekapSesi(sesiId, role);
+  }, [sesiId, role, version, presensiList]);
 }
 
 /** Simulasi: menambahkan satu praktikan dummy hadir ke sesi yang sedang dibuka. Mengembalikan false jika habis. */

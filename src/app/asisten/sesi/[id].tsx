@@ -7,9 +7,8 @@ import { TopBar } from '../../../components/TopBar';
 import { KontrolSesi } from '../../../components/KontrolSesi';
 import { RekapList } from '../../../components/RekapList';
 import { EmptyState } from '../../../components/EmptyState';
-import { getRekapSesi, useSesi } from '../../../constants/dummy';
+import { useRekapSesi, useSesi } from '../../../constants/dummy';
 import { formatJamRentang, formatTanggalPanjang } from '../../../constants/format';
-import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 import { MAX_W, W } from '../../../constants/warna';
 
 export default function DetailSesiAsisten() {
@@ -18,8 +17,7 @@ export default function DetailSesiAsisten() {
   const { width } = useWindowDimensions();
   const lebar = width >= 820;
   const sesi = useSesi(id);
-
-  useRefreshOnFocus();
+  const rekap = useRekapSesi(sesi?.id, 'asisten');
 
   if (!sesi) {
     return (
@@ -31,8 +29,6 @@ export default function DetailSesiAsisten() {
       </View>
     );
   }
-
-  const rekap = getRekapSesi(sesi.id);
   const persen = Math.min(100, (rekap.length / sesi.jumlahPeserta) * 100);
 
   const statusInfo =

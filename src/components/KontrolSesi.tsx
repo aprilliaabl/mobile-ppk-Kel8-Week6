@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput } from 'react-native';
 import { Sesi } from '../constants/types';
-import { bukaSesi, getRekapSesi, tutupSesi } from '../constants/dummy';
+import { bukaSesi, tutupSesi, useRekapSesi } from '../constants/dummy';
 import { Button } from './Button';
 import { BottomSheet } from './BottomSheet';
 import { ConfirmModal } from './ConfirmModal';
@@ -15,7 +15,7 @@ export function KontrolSesi({ sesi, mode = 'ganda' }: { sesi: Sesi; mode?: 'gand
   const [bukaOpen, setBukaOpen] = useState(false);
   const [tutupOpen, setTutupOpen] = useState(false);
   const [catatan, setCatatan] = useState('');
-  const jumlahHadir = getRekapSesi(sesi.id).length;
+  const jumlahHadir = useRekapSesi(sesi.id, 'asisten').length;
 
   const konfirmasiBuka = () => {
     bukaSesi(sesi.id, catatan);
