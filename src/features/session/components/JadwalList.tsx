@@ -9,6 +9,7 @@ import { Ikon } from '../../../components/Ikon';
 import { formatJamRentang, formatTanggal } from '../../../constants/format';
 import { getRekapSesi, useSesiList, userDummy } from '../../../constants/dummy';
 import { cekSudahPresensi } from '../../../constants/presensiStore';
+import { useRiwayatIzinPraktikan } from '../../../constants/izinStore';
 import { MAX_W, W } from '../../../constants/warna';
 
 type Filter = 'semua' | StatusSesi;
@@ -43,6 +44,7 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
   // HP: 1 kolom, tablet: 2 kolom, laptop: 3 kolom
   const cols = width >= 1000 ? 3 : width >= 640 ? 2 : 1;
   const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
+  const izinPraktikan = useRiwayatIzinPraktikan(praktikan.id);
 
   const data = sesiList
     .filter((s) => (statusTetap ? s.status === statusTetap : filter === 'semua' || s.status === filter))
@@ -53,6 +55,12 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
       return { teks: `${getRekapSesi(s.id).length}/${s.jumlahPeserta} praktikan hadir`, warna: s.status === 'dibuka' ? W.green : W.sub };
     }
     if (cekSudahPresensi(s.id, praktikan.id)) return { teks: 'Presensi sudah tercatat', warna: W.green };
+    const izin = izinPraktikan.find((i) => i.sesiId === s.id);
+    if (izin) {
+      if (izin.status === 'disetujui') return { teks: 'Izin disetujui asisten', warna: W.green };
+      if (izin.status === 'ditolak') return { teks: 'Izin ditolak asisten', warna: W.red };
+      return { teks: 'Izin menunggu persetujuan', warna: W.amber };
+    }
     if (s.status === 'dibuka') return { teks: 'Ketuk untuk presensi', warna: W.blue };
     return { teks: 'Lihat detail sesi', warna: W.sub };
   };

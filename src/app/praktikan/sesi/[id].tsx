@@ -119,12 +119,59 @@ export default function DetailSesiPraktikan() {
               <Text style={styles.panelText}>Kamu hadir pukul {waktuHadir} WIB.</Text>
             </View>
           ) : existingIzin ? (
-            <View style={[styles.panel, lebar && { flex: 1 }, styles.panelWarn]}>
-              <Ikon nama="riwayat" size={34} color={W.amber} />
-              <Text style={[styles.panelTitle, { color: W.amber }]}>Pengajuan Izin Terkirim</Text>
-              <Text style={styles.panelText}>
-                Alasan: &quot;{existingIzin.alasan}&quot; ({existingIzin.status.toUpperCase()})
+            <View
+              style={[
+                styles.panel,
+                lebar && { flex: 1 },
+                existingIzin.status === 'disetujui'
+                  ? styles.panelOk
+                  : existingIzin.status === 'ditolak'
+                  ? styles.panelBad
+                  : styles.panelWarn,
+              ]}
+            >
+              <Ikon
+                nama={
+                  existingIzin.status === 'disetujui'
+                    ? 'centang'
+                    : existingIzin.status === 'ditolak'
+                    ? 'kunci'
+                    : 'riwayat'
+                }
+                size={34}
+                color={
+                  existingIzin.status === 'disetujui'
+                    ? W.green
+                    : existingIzin.status === 'ditolak'
+                    ? W.red
+                    : W.amber
+                }
+              />
+              <Text
+                style={[
+                  styles.panelTitle,
+                  {
+                    color:
+                      existingIzin.status === 'disetujui'
+                        ? W.green
+                        : existingIzin.status === 'ditolak'
+                        ? W.red
+                        : W.amber,
+                  },
+                ]}
+              >
+                {existingIzin.status === 'disetujui'
+                  ? 'Permohonan Izin Disetujui'
+                  : existingIzin.status === 'ditolak'
+                  ? 'Permohonan Izin Ditolak'
+                  : 'Menunggu Persetujuan Asisten'}
               </Text>
+              <Text style={styles.panelText}>Alasan: &quot;{existingIzin.alasan}&quot;</Text>
+              {!!existingIzin.diprosesOleh && (
+                <Text style={styles.asistenNote}>
+                  Diproses oleh asisten: {existingIzin.diprosesOleh}
+                </Text>
+              )}
             </View>
           ) : sesi.status === 'belum_dibuka' ? (
             <View style={[styles.panel, lebar && { flex: 1 }]}>
@@ -259,20 +306,57 @@ export default function DetailSesiPraktikan() {
         />
       </BottomSheet>
 
-      {/* Modal umpan balik pengajuan izin berhasil (FR-11) */}
+      {/* Modal umpan balik & status real-time pengajuan izin (FR-11 & FR-14) */}
       <ConfirmModal
         visible={showIzinModal}
         onClose={() => setShowIzinModal(false)}
-        ikon="centang"
-        tone="success"
-        title="Pengajuan Izin Terkirim"
-        message="Permohonan izin ketidakhadiranmu telah disimpan dan menunggu persetujuan asisten."
+        ikon={existingIzin?.status === 'ditolak' ? 'kunci' : 'centang'}
+        tone={existingIzin?.status === 'ditolak' ? 'danger' : 'success'}
+        title={
+          existingIzin?.status === 'disetujui'
+            ? 'Izin Telah Disetujui'
+            : existingIzin?.status === 'ditolak'
+            ? 'Izin Ditolak'
+            : 'Pengajuan Izin Terkirim'
+        }
+        message={
+          existingIzin?.status === 'disetujui'
+            ? 'Permohonan izin ketidakhadiranmu telah disetujui oleh asisten.'
+            : existingIzin?.status === 'ditolak'
+            ? 'Permohonan izin ketidakhadiranmu ditolak oleh asisten.'
+            : 'Permohonan izin ketidakhadiranmu telah disimpan dan sedang menunggu persetujuan asisten.'
+        }
         actions={
           <>
-            <View style={styles.dRow}><Text style={styles.dLabel}>Status</Text><Text style={[styles.dValue, { color: W.amber }]}>{(existingIzin?.status ?? 'pending').toUpperCase()}</Text></View>
+            <View style={styles.dRow}>
+              <Text style={styles.dLabel}>Status</Text>
+              <Text
+                style={[
+                  styles.dValue,
+                  {
+                    color:
+                      existingIzin?.status === 'disetujui'
+                        ? W.green
+                        : existingIzin?.status === 'ditolak'
+                        ? W.red
+                        : W.amber,
+                  },
+                ]}
+              >
+                {existingIzin?.status === 'disetujui'
+                  ? 'DISETUJUI'
+                  : existingIzin?.status === 'ditolak'
+                  ? 'DITOLAK'
+                  : 'MENUNGGU PERSETUJUAN'}
+              </Text>
+            </View>
             <View style={styles.dRow}><Text style={styles.dLabel}>Praktikum</Text><Text style={styles.dValue}>{sesi.nama}</Text></View>
             <View style={styles.dRow}><Text style={styles.dLabel}>Alasan</Text><Text style={styles.dValue}>{existingIzin?.alasan ?? '-'}</Text></View>
+            {!!existingIzin?.diprosesOleh && (
+              <View style={styles.dRow}><Text style={styles.dLabel}>Diproses oleh</Text><Text style={styles.dValue}>{existingIzin.diprosesOleh}</Text></View>
+            )}
             <Button label="Tutup" variant="primary" onPress={() => setShowIzinModal(false)} />
+            <Button label="Lihat riwayat & status izin" variant="ghost" onPress={() => { setShowIzinModal(false); router.navigate('/praktikan/riwayat' as never); }} />
           </>
         }
       />
