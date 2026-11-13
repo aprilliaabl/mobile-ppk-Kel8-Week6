@@ -1,4 +1,4 @@
-export type StatusSesi = 'belum_dibuka' | 'dibuka' | 'ditutup';
+export type StatusSesi = "belum_dibuka" | "dibuka" | "ditutup";
 
 export interface Sesi {
   id: string;
@@ -16,7 +16,7 @@ export interface Sesi {
   ditutupPada?: string;
 }
 
-export type Role = 'asisten' | 'praktikan';
+export type Role = "asisten" | "praktikan";
 
 export interface UserDummy {
   id: string;
@@ -32,10 +32,10 @@ export interface BarisRekap {
   nim: string;
   waktu: string; // contoh: "10.32.15"
   /** Terlambat jika hadir lebih dari 15 menit setelah sesi dimulai. */
-  status: 'TEPAT_WAKTU' | 'TERLAMBAT';
+  status: "TEPAT_WAKTU" | "TERLAMBAT";
 }
 
-export type StatusIzin = 'pending' | 'disetujui' | 'ditolak';
+export type StatusIzin = "pending" | "disetujui" | "ditolak";
 
 export interface PengajuanIzin {
   /** Deterministic ID: `${sesiId}_${praktikanId}` */
@@ -52,3 +52,9 @@ export interface PengajuanIzin {
   waktuPengajuan: string;
   createdAtIso: string;
 }
+
+/** Data yang diisi asisten pada form tambah/ubah sesi. */
+export type DataSesi = Pick<
+  Sesi,
+  "nama" | "kelas" | "ruang" | "waktuMulai" | "waktuSelesai" | "jumlahPeserta"
+>;

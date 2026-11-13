@@ -5,6 +5,7 @@ import { StatusBadge } from '../../../components/StatusBadge';
 import { InfoRow } from '../../../components/InfoRow';
 import { TopBar } from '../../../components/TopBar';
 import { KontrolSesi } from '../../../components/KontrolSesi';
+import { AksiSesi } from '../../../components/AksiSesi';
 import { RekapList } from '../../../components/RekapList';
 import { EmptyState } from '../../../components/EmptyState';
 import { useRekapSesi, useSesi } from '../../../constants/dummy';
@@ -59,6 +60,7 @@ export default function DetailSesiAsisten() {
             {!!sesi.catatan && (
               <Text style={styles.catatan}>Catatan untuk praktikan: <Text style={{ color: W.text }}>{sesi.catatan}</Text></Text>
             )}
+            <AksiSesi sesi={sesi} />
           </View>
 
           {/* Rekap kehadiran */}

@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.aprilliaabl.ppkmobilepertemuan9"
+      "package": "com.informatika.ppkkelompok8",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
