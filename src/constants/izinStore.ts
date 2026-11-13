@@ -335,16 +335,109 @@ export function useDaftarIzinAsisten(sesiId?: string, role: Role = 'asisten'): P
   }, [list, sesiId, role]);
 }
 
+/**
+ * FR-14: Mengambil daftar pengajuan izin milik seorang praktikan secara privat.
+ * Praktikan hanya dapat mengakses miliknya sendiri (`viewerId === praktikanId`)
+ * dan tidak dapat melihat pengajuan izin milik praktikan lain.
+ */
+export function getRiwayatIzinPraktikan(
+  praktikanId: string,
+  viewerId: string = praktikanId,
+  viewerRole: Role = 'praktikan'
+): PengajuanIzin[] {
+  if (!praktikanId?.trim()) return [];
+  if (viewerRole === 'praktikan' && viewerId !== praktikanId) {
+    return [];
+  }
+  return izinStore.filter((item) => item.praktikanId === praktikanId);
+}
+
 export function useIzinSesiPraktikan(
   sesiId: string | undefined,
   praktikanId: string | undefined
 ): PengajuanIzin | undefined {
   const list = useSyncExternalStore(subscribeIzin, getIzinSnapshot, getIzinSnapshot);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || !sesiId || !praktikanId) return;
+    const docId = buatIdIzin(sesiId, praktikanId);
+    const ref = doc(db, COLLECTIONS.IZIN, docId);
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as PengajuanIzin;
+        const idx = izinStore.findIndex((item) => item.id === docId);
+        const merged: PengajuanIzin = { ...data, id: docId };
+        if (idx === -1) {
+          izinStore.unshift(merged);
+        } else {
+          izinStore[idx] = merged;
+        }
+        emitIzin();
+      },
+      (err) => {
+        console.warn('[Firestore] Listener status izin sesi praktikan error:', err);
+      }
+    );
+    return () => unsubscribe();
+  }, [sesiId, praktikanId]);
+
   if (!sesiId || !praktikanId) return undefined;
   const docId = buatIdIzin(sesiId, praktikanId);
   return list.find(
-    (item) => item.id === docId || (item.sesiId === sesiId && item.praktikanId === praktikanId)
+    (item) =>
+      (item.id === docId || (item.sesiId === sesiId && item.praktikanId === praktikanId)) &&
+      item.praktikanId === praktikanId
   );
+}
+
+/**
+ * FR-14: Hook real-time bagi praktikan untuk memantau seluruh pengajuan izin miliknya sendiri.
+ * Memfilter query berdasarkan `praktikanId` sehingga permintaan praktikan lain tidak pernah terekspos.
+ */
+export function useRiwayatIzinPraktikan(praktikanId: string): PengajuanIzin[] {
+  const list = useSyncExternalStore(subscribeIzin, getIzinSnapshot, getIzinSnapshot);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || !praktikanId) return;
+    const q = query(
+      collection(db, COLLECTIONS.IZIN),
+      where('praktikanId', '==', praktikanId)
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        let changed = false;
+        snap.docChanges().forEach((change) => {
+          if (change.type === 'added' || change.type === 'modified') {
+            const data = change.doc.data() as PengajuanIzin;
+            if (data.praktikanId !== praktikanId) return;
+            const docId = change.doc.id || buatIdIzin(data.sesiId, data.praktikanId);
+            const idx = izinStore.findIndex((item) => item.id === docId);
+            const merged: PengajuanIzin = { ...data, id: docId };
+            if (idx === -1) {
+              izinStore.unshift(merged);
+              changed = true;
+            } else {
+              izinStore[idx] = merged;
+              changed = true;
+            }
+          }
+        });
+        if (changed) emitIzin();
+      },
+      (err) => {
+        console.warn('[Firestore] Listener riwayat izin praktikan error:', err);
+      }
+    );
+    return () => unsubscribe();
+  }, [praktikanId]);
+
+  return useMemo(() => {
+    if (!praktikanId) return [];
+    return list.filter((item) => item.praktikanId === praktikanId);
+  }, [list, praktikanId]);
 }
 
 export function resetIzinDemo() {
