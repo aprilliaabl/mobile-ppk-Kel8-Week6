@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { JadwalList } from '../../../features/session/components/JadwalList';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
 import { useSesiList, userDummy } from '../../../constants/dummy';
-import { cekSudahPresensi, presensiStore } from '../../../constants/presensiStore';
+import { cekSudahPresensi, useRiwayatPraktikan } from '../../../constants/presensiStore';
 import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 import { W } from '../../../constants/warna';
 
@@ -11,9 +11,10 @@ export default function BerandaPraktikan() {
   const router = useRouter();
   const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
   const sesiList = useSesiList();
+  const riwayat = useRiwayatPraktikan(praktikan.id);
   useRefreshOnFocus();
 
-  const jumlahHadir = presensiStore.filter((p) => p.praktikanId === praktikan.id).length;
+  const jumlahHadir = riwayat.length;
   const perluPresensi = sesiList.find((s) => s.status === 'dibuka' && !cekSudahPresensi(s.id, praktikan.id));
 
   return (
