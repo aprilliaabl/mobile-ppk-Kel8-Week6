@@ -76,6 +76,8 @@ export interface PengajuanIzin {
   tanggalPengajuan: string;
   waktuPengajuan: string;
   createdAtIso: string;
+  diprosesOleh?: string;
+  diprosesPada?: string;
 }
 
 /** Data yang diisi asisten pada form tambah/ubah sesi. */

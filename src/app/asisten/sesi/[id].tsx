@@ -7,8 +7,10 @@ import { TopBar } from '../../../components/TopBar';
 import { KontrolSesi } from '../../../components/KontrolSesi';
 import { AksiSesi } from '../../../components/AksiSesi';
 import { RekapList } from '../../../components/RekapList';
+import { DaftarIzinAsisten } from '../../../components/DaftarIzinAsisten';
 import { EmptyState } from '../../../components/EmptyState';
 import { useRekapSesi, useSesi } from '../../../constants/dummy';
+import { useDaftarIzinAsisten } from '../../../constants/izinStore';
 import { formatJamRentang, formatTanggalPanjang } from '../../../constants/format';
 import { MAX_W, W } from '../../../constants/warna';
 
@@ -19,6 +21,7 @@ export default function DetailSesiAsisten() {
   const lebar = width >= 820;
   const sesi = useSesi(id);
   const rekap = useRekapSesi(sesi?.id, 'asisten');
+  const daftarIzin = useDaftarIzinAsisten(sesi?.id, 'asisten');
 
   if (!sesi) {
     return (
@@ -85,6 +88,15 @@ export default function DetailSesiAsisten() {
               <RekapList data={rekap} />
             )}
           </View>
+        </View>
+
+        {/* Pengajuan Izin Sesi Ini (FR-13) */}
+        <View style={[styles.card, { width: '100%', maxWidth: MAX_W, alignSelf: 'center', marginTop: 14 }]}>
+          <View style={styles.top}>
+            <Text style={styles.sectionTitle}>Pengajuan Izin Praktikan</Text>
+            <Text style={styles.count}>{daftarIzin.length} Pengajuan</Text>
+          </View>
+          <DaftarIzinAsisten data={daftarIzin} />
         </View>
       </ScrollView>
 
