@@ -142,18 +142,28 @@ export async function hapusSesi(id: string): Promise<void> {
   emit();
 }
 
-export function bukaSesi(id: string, catatan?: string) {
+/** FR-05: membuka sesi. Menolak jika sesi tidak ditemukan, sudah dibuka, atau sudah ditutup. */
+export async function bukaSesi(id: string, catatan?: string): Promise<void> {
+  const sesi = sesiState.find((s) => s.id === id);
+  if (!sesi) throw new Error('Sesi tidak ditemukan.');
+  if (sesi.status === 'dibuka') throw new Error('Sesi ini sudah dibuka.');
+  if (sesi.status === 'ditutup') throw new Error('Sesi yang sudah ditutup tidak dapat dibuka kembali.');
   sesiState = sesiState.map((s) =>
-    s.id === id && s.status === 'belum_dibuka'
+    s.id === id
       ? { ...s, status: 'dibuka' as StatusSesi, catatan: catatan?.trim() || undefined, dibukaPada: new Date().toISOString() }
       : s
   );
   emit();
 }
 
-export function tutupSesi(id: string) {
+/** FR-05: menutup sesi. Menolak jika sesi tidak ditemukan, belum dibuka, atau sudah ditutup. */
+export async function tutupSesi(id: string): Promise<void> {
+  const sesi = sesiState.find((s) => s.id === id);
+  if (!sesi) throw new Error('Sesi tidak ditemukan.');
+  if (sesi.status === 'belum_dibuka') throw new Error('Sesi belum dibuka, jadi belum dapat ditutup.');
+  if (sesi.status === 'ditutup') throw new Error('Sesi ini sudah ditutup.');
   sesiState = sesiState.map((s) =>
-    s.id === id && s.status === 'dibuka' ? { ...s, status: 'ditutup' as StatusSesi, ditutupPada: new Date().toISOString() } : s
+    s.id === id ? { ...s, status: 'ditutup' as StatusSesi, ditutupPada: new Date().toISOString() } : s
   );
   emit();
 }
