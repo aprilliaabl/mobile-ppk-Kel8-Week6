@@ -133,7 +133,25 @@ function menitDariWaktu(w: string): number {
 // ---------- Store sederhana (di memori) supaya perubahan status sesi terlihat di semua layar ----------
 // Jika Firestore aktif, daftar sesi diisi dari server (mulai kosong). Jika tidak, memakai data contoh lokal.
 let sesiState: Sesi[] = sesiAktif() ? [] : buatSesiAwal();
-let statusSesiState: { loading: boolean; error: string | null } = { loading: sesiAktif(), error: null };
+export interface StatusSesiData {
+  loading: boolean;
+  error: string | null;
+  /** true jika daftar sesi berasal dari cache (koneksi terputus), bukan data terbaru dari server. */
+  dariCache: boolean;
+}
+
+/** Perubahan status sesi yang dilakukan pengguna lain (FR-09), dipakai untuk notifikasi dalam aplikasi. */
+export interface PerubahanSesi {
+  kunci: number;
+  sesi: Sesi;
+  dari: StatusSesi;
+  ke: StatusSesi;
+}
+
+let statusSesiState: StatusSesiData = { loading: sesiAktif(), error: null, dariCache: false };
+let sudahMuatPertama = false;
+let kunciPerubahan = 0;
+let perubahanTerakhir: PerubahanSesi | null = null;
 let hentikanSesi: (() => void) | null = null;
 let rekapVersion = 0;
 const listeners = new Set<() => void>();
@@ -149,21 +167,32 @@ subscribePresensi(() => {
 
 function mulaiListenerSesi() {
   if (!sesiAktif() || hentikanSesi) return;
-  statusSesiState = { loading: sesiState.length === 0, error: null };
+  statusSesiState = { loading: sesiState.length === 0, error: null, dariCache: false };
+  sudahMuatPertama = false;
   try {
     hentikanSesi = dengarSesi(
-      (daftar) => {
+      (daftar, info) => {
+        // FR-09: catat perubahan status yang dilakukan pengguna lain.
+        if (sudahMuatPertama) {
+          for (const baru of daftar) {
+            const lama = sesiState.find((x) => x.id === baru.id);
+            if (lama && lama.status !== baru.status && !info.tertunda.has(baru.id)) {
+              perubahanTerakhir = { kunci: ++kunciPerubahan, sesi: baru, dari: lama.status, ke: baru.status };
+            }
+          }
+        }
+        sudahMuatPertama = true;
         sesiState = daftar;
-        statusSesiState = { loading: false, error: null };
+        statusSesiState = { loading: false, error: null, dariCache: info.dariCache };
         emit();
       },
       (pesan) => {
-        statusSesiState = { loading: false, error: pesan };
+        statusSesiState = { loading: false, error: pesan, dariCache: false };
         emit();
       },
     );
   } catch {
-    statusSesiState = { loading: false, error: "Gagal terhubung ke Firestore." };
+    statusSesiState = { loading: false, error: "Gagal terhubung ke Firestore.", dariCache: false };
   }
 }
 
@@ -196,6 +225,13 @@ const snapshotStatusSesi = () => statusSesiState;
 /** Status pemuatan daftar sesi: sedang memuat atau gagal (mis. koneksi terputus). */
 export function useSesiStatus(): { loading: boolean; error: string | null } {
   return useSyncExternalStore(subscribe, snapshotStatusSesi, snapshotStatusSesi);
+}
+
+const snapshotPerubahan = () => perubahanTerakhir;
+
+/** FR-09: perubahan status sesi terbaru dari pengguna lain (null jika belum ada). */
+export function usePerubahanSesi(): PerubahanSesi | null {
+  return useSyncExternalStore(subscribe, snapshotPerubahan, snapshotPerubahan);
 }
 
 export function useSesiList(): Sesi[] {

@@ -86,6 +86,11 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
       ListHeaderComponent={
         <View style={styles.headerWrap}>
           {header}
+          {statusSesi.dariCache && !statusSesi.loading && !statusSesi.error && (
+            <View style={styles.offline}>
+              <Text style={styles.offlineText}>Koneksi terputus. Menampilkan data terakhir dan akan diperbarui otomatis saat tersambung.</Text>
+            </View>
+          )}
           <Text style={styles.section}>{judul}</Text>
           {!statusTetap && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {FILTERS.map((f) => {
@@ -166,4 +171,6 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 13, color: W.sub, flexShrink: 1 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: W.line, paddingTop: 12 },
   footerText: { fontSize: 13, fontWeight: '700' },
+  offline: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderRadius: 12, padding: 12, marginTop: 14 },
+  offlineText: { fontSize: 13, color: W.amber, fontWeight: '600', lineHeight: 19 },
 });
