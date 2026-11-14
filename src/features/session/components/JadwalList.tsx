@@ -5,9 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Sesi, StatusSesi } from '../../../constants/types';
 import { StatusBadge, WARNA_STATUS } from '../../../components/StatusBadge';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, LoadingState } from '../../../components/StateView';
 import { Ikon } from '../../../components/Ikon';
 import { formatJamRentang, formatTanggal } from '../../../constants/format';
-import { getRekapSesi, useSesiList, userDummy } from '../../../constants/dummy';
+import { getRekapSesi, muatUlangSesi, useSesiList, useSesiStatus, userDummy } from '../../../constants/dummy';
 import { cekSudahPresensi } from '../../../constants/presensiStore';
 import { useRiwayatIzinPraktikan } from '../../../constants/izinStore';
 import { MAX_W, W } from '../../../constants/warna';
@@ -35,6 +36,7 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const sesiList = useSesiList();
+  const statusSesi = useSesiStatus();
   const [filter, setFilter] = useState<Filter>('semua');
   const [tick, setTick] = useState(0);
 
@@ -94,11 +96,17 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
         </View>
       }
       ListEmptyComponent={
-        <EmptyState
-          ikon="kosong"
-          judul={kosong?.judul ?? (filter === 'semua' ? 'Belum ada jadwal praktikum' : 'Tidak ada sesi')}
-          deskripsi={kosong?.deskripsi ?? (filter === 'semua' ? 'Jadwal akan muncul di sini setelah ditambahkan.' : 'Tidak ada sesi dengan status ini. Coba pilih filter lain.')}
-        />
+        statusSesi.error ? (
+          <ErrorState pesan={statusSesi.error} onCoba={muatUlangSesi} />
+        ) : statusSesi.loading ? (
+          <LoadingState teks="Memuat jadwal praktikum..." />
+        ) : (
+          <EmptyState
+            ikon="kosong"
+            judul={kosong?.judul ?? (filter === 'semua' ? 'Belum ada jadwal praktikum' : 'Tidak ada sesi')}
+            deskripsi={kosong?.deskripsi ?? (filter === 'semua' ? 'Jadwal akan muncul di sini setelah ditambahkan.' : 'Tidak ada sesi dengan status ini. Coba pilih filter lain.')}
+          />
+        )
       }
       renderItem={({ item }) => {
         const f = footerUntuk(item);
