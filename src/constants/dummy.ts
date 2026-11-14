@@ -12,12 +12,14 @@ import {
 } from './presensiStore';
 import { resetIzinDemo } from './izinStore';
 import {
+  bukaSesiFS,
   dengarSesi,
   hapusSesiFS,
   sesiAktif,
   tambahSesiFS,
+  tutupSesiFS,
   ubahSesiFS,
-} from './sesiFirestore';
+} from "./sesiFirestore";
 import type {
   BarisRekap,
   DataSesi,
@@ -230,6 +232,7 @@ export async function hapusSesi(id: string): Promise<void> {
 
 /** FR-05: membuka sesi. Menolak jika sesi tidak ditemukan, sudah dibuka, atau sudah ditutup. */
 export async function bukaSesi(id: string, catatan?: string): Promise<void> {
+  if (sesiAktif()) return bukaSesiFS(id, catatan);
   const sesi = sesiState.find((s) => s.id === id);
   if (!sesi) throw new Error("Sesi tidak ditemukan.");
   if (sesi.status === "dibuka") throw new Error("Sesi ini sudah dibuka.");
@@ -250,6 +253,7 @@ export async function bukaSesi(id: string, catatan?: string): Promise<void> {
 
 /** FR-05: menutup sesi. Menolak jika sesi tidak ditemukan, belum dibuka, atau sudah ditutup. */
 export async function tutupSesi(id: string): Promise<void> {
+  if (sesiAktif()) return tutupSesiFS(id);
   const sesi = sesiState.find((s) => s.id === id);
   if (!sesi) throw new Error("Sesi tidak ditemukan.");
   if (sesi.status === "belum_dibuka")

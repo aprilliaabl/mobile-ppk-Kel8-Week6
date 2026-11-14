@@ -6,6 +6,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
   type DocumentData,
@@ -115,4 +116,45 @@ export function ubahSesiFS(id: string, data: Partial<DataSesi>): Promise<void> {
 /** FR-04: hapus sesi. */
 export function hapusSesiFS(id: string): Promise<void> {
   return jalankan(() => deleteDoc(doc(ambilDb(), COLLECTIONS.SESI, id)));
+}
+
+/** FR-05: buka sesi dengan transaksi, supaya dua asisten yang menekan bersamaan tidak membuka dua kali. */
+export function bukaSesiFS(id: string, catatan?: string): Promise<void> {
+  return jalankan(() => {
+    const firestore = ambilDb();
+    return runTransaction(firestore, async (tx) => {
+      const ref = doc(firestore, COLLECTIONS.SESI, id);
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new GalatSesi('Sesi tidak ditemukan.');
+      const status = snap.data().status as StatusSesi;
+      if (status === 'dibuka') throw new GalatSesi('Sesi ini sudah dibuka.');
+      if (status === 'ditutup') throw new GalatSesi('Sesi yang sudah ditutup tidak dapat dibuka kembali.');
+      tx.update(ref, {
+        status: 'dibuka',
+        catatan: catatan?.trim() ?? '',
+        dibukaPada: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+  });
+}
+
+/** FR-05: tutup sesi dengan transaksi. */
+export function tutupSesiFS(id: string): Promise<void> {
+  return jalankan(() => {
+    const firestore = ambilDb();
+    return runTransaction(firestore, async (tx) => {
+      const ref = doc(firestore, COLLECTIONS.SESI, id);
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new GalatSesi('Sesi tidak ditemukan.');
+      const status = snap.data().status as StatusSesi;
+      if (status === 'belum_dibuka') throw new GalatSesi('Sesi belum dibuka, jadi belum dapat ditutup.');
+      if (status === 'ditutup') throw new GalatSesi('Sesi ini sudah ditutup.');
+      tx.update(ref, {
+        status: 'ditutup',
+        ditutupPada: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+  });
 }
