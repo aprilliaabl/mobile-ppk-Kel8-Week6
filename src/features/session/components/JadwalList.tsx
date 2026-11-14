@@ -8,7 +8,7 @@ import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, LoadingState } from '../../../components/StateView';
 import { Ikon } from '../../../components/Ikon';
 import { formatJamRentang, formatTanggal } from '../../../constants/format';
-import { getRekapSesi, muatUlangSesi, useSesiList, useSesiStatus, userDummy } from '../../../constants/dummy';
+import { getRekapSesi, muatUlangSesi, sesiBerkaitan, useSesiList, useSesiStatus, userDummy } from '../../../constants/dummy';
 import { cekSudahPresensi } from '../../../constants/presensiStore';
 import { useRiwayatIzinPraktikan } from '../../../constants/izinStore';
 import { MAX_W, W } from '../../../constants/warna';
@@ -35,7 +35,7 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const sesiList = useSesiList();
+  const sesiSemua = useSesiList();
   const statusSesi = useSesiStatus();
   const [filter, setFilter] = useState<Filter>('semua');
   const [tick, setTick] = useState(0);
@@ -47,6 +47,10 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
   const cols = width >= 1000 ? 3 : width >= 640 ? 2 : 1;
   const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
   const izinPraktikan = useRiwayatIzinPraktikan(praktikan.id);
+
+  // FR-06: praktikan hanya melihat sesi yang berkaitan dengan kelasnya. Asisten melihat semua sesi.
+  const sesiList = role === 'praktikan' ? sesiSemua.filter((s) => sesiBerkaitan(s, praktikan)) : sesiSemua;
+  const adaKelas = role === 'praktikan' && !!praktikan.kelas;
 
   const data = sesiList
     .filter((s) => (statusTetap ? s.status === statusTetap : filter === 'semua' || s.status === filter))
@@ -103,8 +107,8 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
         ) : (
           <EmptyState
             ikon="kosong"
-            judul={kosong?.judul ?? (filter === 'semua' ? 'Belum ada jadwal praktikum' : 'Tidak ada sesi')}
-            deskripsi={kosong?.deskripsi ?? (filter === 'semua' ? 'Jadwal akan muncul di sini setelah ditambahkan.' : 'Tidak ada sesi dengan status ini. Coba pilih filter lain.')}
+            judul={kosong?.judul ?? (filter !== 'semua' ? 'Tidak ada sesi' : adaKelas ? `Belum ada jadwal untuk kelas ${praktikan.kelas}` : 'Belum ada jadwal praktikum')}
+            deskripsi={kosong?.deskripsi ?? (filter !== 'semua' ? 'Tidak ada sesi dengan status ini. Coba pilih filter lain.' : adaKelas ? 'Jadwal kelasmu akan muncul di sini setelah asisten menambahkannya.' : 'Jadwal akan muncul di sini setelah ditambahkan.')}
           />
         )
       }

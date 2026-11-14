@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSesi, userDummy } from '../../../constants/dummy';
+import { sesiBerkaitan, useSesi, userDummy } from '../../../constants/dummy';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { InfoRow } from '../../../components/InfoRow';
 import { Button } from '../../../components/Button';
@@ -54,6 +54,18 @@ export default function DetailSesiPraktikan() {
         <TopBar title="Detail Sesi" fallback="/praktikan/beranda" />
         <View style={styles.center}>
           <EmptyState ikon="kosong" judul="Sesi tidak ditemukan" deskripsi="Sesi yang kamu cari tidak ada dalam daftar." />
+        </View>
+      </View>
+    );
+  }
+
+    // FR-06: sesi kelas lain tidak ditampilkan kepada praktikan ini.
+  if (!sesiBerkaitan(sesi, praktikan)) {
+    return (
+      <View style={styles.root}>
+        <TopBar title="Detail Sesi" fallback="/praktikan/beranda" />
+        <View style={styles.center}>
+          <EmptyState ikon="kunci" judul="Sesi ini bukan untuk kelasmu" deskripsi={`Sesi ini untuk kelas ${sesi.kelas}, sedangkan kamu terdaftar di kelas ${praktikan.kelas}.`} />
         </View>
       </View>
     );

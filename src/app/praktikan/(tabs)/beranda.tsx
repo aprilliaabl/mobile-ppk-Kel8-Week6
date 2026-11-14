@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { JadwalList } from '../../../features/session/components/JadwalList';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
-import { useSesiList, userDummy } from '../../../constants/dummy';
+import { useSesiPraktikan, userDummy } from '../../../constants/dummy';
 import { cekSudahPresensi, useRiwayatPraktikan } from '../../../constants/presensiStore';
 import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 import { W } from '../../../constants/warna';
@@ -10,7 +10,7 @@ import { W } from '../../../constants/warna';
 export default function BerandaPraktikan() {
   const router = useRouter();
   const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
-  const sesiList = useSesiList();
+  const sesiList = useSesiPraktikan(praktikan); // hanya sesi untuk kelas praktikan (FR-06)
   const riwayat = useRiwayatPraktikan(praktikan.id);
   useRefreshOnFocus();
 
@@ -20,9 +20,14 @@ export default function BerandaPraktikan() {
   return (
     <JadwalList
       role="praktikan"
+      judul={praktikan.kelas ? `Jadwal Kelas ${praktikan.kelas}` : 'Jadwal Praktikum'}
       header={
         <View style={{ gap: 12 }}>
-          <HeaderCard badge="PRAKTIKAN" title={`Halo, ${praktikan.nama}`} subtitle="Lihat jadwal, lakukan presensi, dan cek catatan kehadiranmu">
+          <HeaderCard
+            badge="PRAKTIKAN"
+            title={`Halo, ${praktikan.nama}`}
+            subtitle={praktikan.kelas ? `Kelas ${praktikan.kelas} • lihat jadwal dan lakukan presensi` : 'Lihat jadwal, lakukan presensi, dan cek catatan kehadiranmu'}
+          >
             <View style={styles.stats}>
               <StatBox label="Presensi tercatat" value={jumlahHadir} color={W.green} />
               <StatBox label="Sesi dibuka" value={sesiList.filter((s) => s.status === 'dibuka').length} />
