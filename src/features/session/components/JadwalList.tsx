@@ -154,6 +154,8 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
 const styles = StyleSheet.create({
   list: { paddingHorizontal: 10, flexGrow: 1, width: '100%', maxWidth: MAX_W, alignSelf: 'center' },
   headerWrap: { paddingHorizontal: 6, marginBottom: 6 },
+  offline: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderRadius: 12, padding: 12, marginTop: 14 },
+  offlineText: { fontSize: 13, color: W.amber, fontWeight: '600', lineHeight: 19 },
   section: { fontSize: 18, fontWeight: '800', color: W.text, marginTop: 22, marginBottom: 12 },
   chips: { gap: 8, paddingBottom: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: W.card, borderWidth: 1, borderColor: W.line },
@@ -171,6 +173,4 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 13, color: W.sub, flexShrink: 1 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: W.line, paddingTop: 12 },
   footerText: { fontSize: 13, fontWeight: '700' },
-  offline: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderRadius: 12, padding: 12, marginTop: 14 },
-  offlineText: { fontSize: 13, color: W.amber, fontWeight: '600', lineHeight: 19 },
 });

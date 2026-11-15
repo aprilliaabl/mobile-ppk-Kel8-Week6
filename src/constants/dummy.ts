@@ -19,7 +19,7 @@ import {
   tambahSesiFS,
   tutupSesiFS,
   ubahSesiFS,
-} from "./sesiFirestore";
+} from './sesiFirestore';
 import type {
   BarisRekap,
   DataSesi,
@@ -47,7 +47,7 @@ function buatSesiAwal(): Sesi[] {
     {
       id: "s-1",
       nama: "Praktikum Struktur Data",
-      kelas: "IF-2A",
+      kelas: "IF-2B",
       ruang: "Lab Komputer 1",
       waktuMulai: at(0, 8, 0),
       waktuSelesai: at(0, 10, 0),
@@ -173,6 +173,7 @@ function mulaiListenerSesi() {
     hentikanSesi = dengarSesi(
       (daftar, info) => {
         // FR-09: catat perubahan status yang dilakukan pengguna lain.
+        // Perubahan dari perangkat ini (masih tertunda) dilewati, karena penggunanya sudah tahu.
         if (sudahMuatPertama) {
           for (const baru of daftar) {
             const lama = sesiState.find((x) => x.id === baru.id);
@@ -223,7 +224,7 @@ const snapshotVersion = () => rekapVersion;
 const snapshotStatusSesi = () => statusSesiState;
 
 /** Status pemuatan daftar sesi: sedang memuat atau gagal (mis. koneksi terputus). */
-export function useSesiStatus(): { loading: boolean; error: string | null } {
+export function useSesiStatus(): StatusSesiData {
   return useSyncExternalStore(subscribe, snapshotStatusSesi, snapshotStatusSesi);
 }
 

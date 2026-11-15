@@ -86,8 +86,11 @@ function dariDoc(d: QueryDocumentSnapshot<DocumentData>): Sesi {
   };
 }
 
+/** Keterangan tambahan dari setiap pembaruan data sesi. */
 export interface InfoSnapshotSesi {
+  /** true jika data berasal dari cache perangkat (mis. koneksi terputus), bukan dari server. */
   dariCache: boolean;
+  /** ID sesi yang perubahannya berasal dari perangkat ini dan belum dikonfirmasi server. */
   tertunda: Set<string>;
 }
 
