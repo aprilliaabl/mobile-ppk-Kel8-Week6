@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,6 +39,17 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
   const statusSesi = useSesiStatus();
   const [filter, setFilter] = useState<Filter>('semua');
   const [tick, setTick] = useState(0);
+
+  // Banner offline baru tampil jika data dari cache bertahan >1,5 detik, supaya tidak berkedip saat aplikasi baru dibuka.
+  const [offlineLama, setOfflineLama] = useState(false);
+  useEffect(() => {
+    if (!statusSesi.dariCache) {
+      setOfflineLama(false);
+      return;
+    }
+    const timer = setTimeout(() => setOfflineLama(true), 1500);
+    return () => clearTimeout(timer);
+  }, [statusSesi.dariCache]);
 
   // Segarkan daftar saat layar kembali difokuskan (mis. setelah presensi / rekap berubah).
   useFocusEffect(useCallback(() => setTick((t) => t + 1), []));
@@ -86,9 +97,9 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
       ListHeaderComponent={
         <View style={styles.headerWrap}>
           {header}
-          {statusSesi.dariCache && !statusSesi.loading && !statusSesi.error && (
+          {offlineLama && !statusSesi.loading && !statusSesi.error && (
             <View style={styles.offline}>
-              <Text style={styles.offlineText}>Koneksi terputus. Menampilkan data terakhir dan akan diperbarui otomatis saat tersambung.</Text>
+              <Text style={styles.offlineText}>Koneksi terputus. Menampilkan jadwal terakhir yang tersimpan di perangkat dan akan diperbarui otomatis saat tersambung.</Text>
             </View>
           )}
           <Text style={styles.section}>{judul}</Text>

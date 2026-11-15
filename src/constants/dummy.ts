@@ -10,6 +10,7 @@ import {
   resetPresensiDemo,
   subscribePresensi,
 } from './presensiStore';
+import { bacaCacheSesi, simpanCacheSesi } from './cacheSesi';
 import { resetIzinDemo } from './izinStore';
 import {
   bukaSesiFS,
@@ -150,6 +151,7 @@ export interface PerubahanSesi {
 
 let statusSesiState: StatusSesiData = { loading: sesiAktif(), error: null, dariCache: false };
 let sudahMuatPertama = false;
+let dataServerDiterima = false;
 let kunciPerubahan = 0;
 let perubahanTerakhir: PerubahanSesi | null = null;
 let hentikanSesi: (() => void) | null = null;
@@ -165,13 +167,34 @@ subscribePresensi(() => {
   emit();
 });
 
+/** FR-10: menampilkan salinan jadwal dari perangkat selagi menunggu server (atau saat tidak ada koneksi). */
+function muatDariPerangkat() {
+  bacaCacheSesi().then((cache) => {
+    // Jangan menimpa data yang sudah datang dari server lebih dulu.
+    if (!cache || cache.length === 0 || dataServerDiterima || sesiState.length > 0) return;
+    sesiState = cache;
+    statusSesiState = { loading: false, error: null, dariCache: true };
+    emit();
+  });
+}
+
 function mulaiListenerSesi() {
   if (!sesiAktif() || hentikanSesi) return;
   statusSesiState = { loading: sesiState.length === 0, error: null, dariCache: false };
   sudahMuatPertama = false;
+  dataServerDiterima = false;
+  if (sesiState.length === 0) muatDariPerangkat();
   try {
     hentikanSesi = dengarSesi(
       (daftar, info) => {
+        // Saat offline, Firestore dapat mengirim snapshot kosong dari cache memori.
+        // Jangan menimpa jadwal yang sudah tampil dari penyimpanan perangkat.
+        if (info.dariCache && daftar.length === 0 && sesiState.length > 0) {
+          statusSesiState = { loading: false, error: null, dariCache: true };
+          emit();
+          return;
+        }
+
         // FR-09: catat perubahan status yang dilakukan pengguna lain.
         // Perubahan dari perangkat ini (masih tertunda) dilewati, karena penggunanya sudah tahu.
         if (sudahMuatPertama) {
@@ -183,6 +206,10 @@ function mulaiListenerSesi() {
           }
         }
         sudahMuatPertama = true;
+        if (!info.dariCache) {
+          dataServerDiterima = true;
+          simpanCacheSesi(daftar); // FR-10: simpan salinan terbaru dari server ke perangkat
+        }
         sesiState = daftar;
         statusSesiState = { loading: false, error: null, dariCache: info.dariCache };
         emit();
