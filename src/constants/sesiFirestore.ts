@@ -86,12 +86,28 @@ function dariDoc(d: QueryDocumentSnapshot<DocumentData>): Sesi {
   };
 }
 
+/** Keterangan tambahan dari setiap pembaruan data sesi. */
+export interface InfoSnapshotSesi {
+  /** true jika data berasal dari cache perangkat (mis. koneksi terputus), bukan dari server. */
+  dariCache: boolean;
+  /** ID sesi yang perubahannya berasal dari perangkat ini dan belum dikonfirmasi server. */
+  tertunda: Set<string>;
+}
+
 /** FR-09: mendengarkan seluruh sesi secara real-time. Mengembalikan fungsi untuk berhenti mendengarkan. */
-export function dengarSesi(onData: (daftar: Sesi[]) => void, onError: (pesan: string) => void): () => void {
+export function dengarSesi(
+  onData: (daftar: Sesi[], info: InfoSnapshotSesi) => void,
+  onError: (pesan: string) => void
+): () => void {
   const q = query(collection(ambilDb(), COLLECTIONS.SESI), orderBy('waktuMulai'));
   return onSnapshot(
     q,
-    (snap) => onData(snap.docs.map(dariDoc)),
+    { includeMetadataChanges: true },
+    (snap) =>
+      onData(snap.docs.map(dariDoc), {
+        dariCache: snap.metadata.fromCache,
+        tertunda: new Set(snap.docs.filter((d) => d.metadata.hasPendingWrites).map((d) => d.id)),
+      }),
     (err) => onError(pesanFirestore(err))
   );
 }
