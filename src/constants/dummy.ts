@@ -11,6 +11,15 @@ import {
   subscribePresensi,
 } from './presensiStore';
 import { resetIzinDemo } from './izinStore';
+import {
+  bukaSesiFS,
+  dengarSesi,
+  hapusSesiFS,
+  sesiAktif,
+  tambahSesiFS,
+  tutupSesiFS,
+  ubahSesiFS,
+} from "./sesiFirestore";
 import type {
   BarisRekap,
   DataSesi,
@@ -122,7 +131,10 @@ function menitDariWaktu(w: string): number {
 }
 
 // ---------- Store sederhana (di memori) supaya perubahan status sesi terlihat di semua layar ----------
-let sesiState: Sesi[] = buatSesiAwal();
+// Jika Firestore aktif, daftar sesi diisi dari server (mulai kosong). Jika tidak, memakai data contoh lokal.
+let sesiState: Sesi[] = sesiAktif() ? [] : buatSesiAwal();
+let statusSesiState: { loading: boolean; error: string | null } = { loading: sesiAktif(), error: null };
+let hentikanSesi: (() => void) | null = null;
 let rekapVersion = 0;
 const listeners = new Set<() => void>();
 const emit = () => {
@@ -135,14 +147,56 @@ subscribePresensi(() => {
   emit();
 });
 
+function mulaiListenerSesi() {
+  if (!sesiAktif() || hentikanSesi) return;
+  statusSesiState = { loading: sesiState.length === 0, error: null };
+  try {
+    hentikanSesi = dengarSesi(
+      (daftar) => {
+        sesiState = daftar;
+        statusSesiState = { loading: false, error: null };
+        emit();
+      },
+      (pesan) => {
+        statusSesiState = { loading: false, error: pesan };
+        emit();
+      },
+    );
+  } catch {
+    statusSesiState = { loading: false, error: "Gagal terhubung ke Firestore." };
+  }
+}
+
+function hentikanListenerSesi() {
+  hentikanSesi?.();
+  hentikanSesi = null;
+}
+
 function subscribe(l: () => void) {
   listeners.add(l);
+  if (listeners.size === 1) mulaiListenerSesi();
   return () => {
     listeners.delete(l);
+    if (listeners.size === 0) hentikanListenerSesi();
   };
+}
+
+/** Memulai ulang pendengar sesi, dipakai tombol "Coba Lagi" saat koneksi terganggu. */
+export function muatUlangSesi() {
+  if (listeners.size === 0) return;
+  hentikanListenerSesi();
+  mulaiListenerSesi();
+  emit();
 }
 const snapshot = () => sesiState;
 const snapshotVersion = () => rekapVersion;
+
+const snapshotStatusSesi = () => statusSesiState;
+
+/** Status pemuatan daftar sesi: sedang memuat atau gagal (mis. koneksi terputus). */
+export function useSesiStatus(): { loading: boolean; error: string | null } {
+  return useSyncExternalStore(subscribe, snapshotStatusSesi, snapshotStatusSesi);
+}
 
 export function useSesiList(): Sesi[] {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
@@ -154,6 +208,7 @@ export function useSesi(id: string | undefined): Sesi | undefined {
 
 // CRUD sesi. Dibuat async agar nanti isinya tinggal diganti dengan Firestore tanpa mengubah pemanggil.
 export async function tambahSesi(data: DataSesi): Promise<string> {
+  if (sesiAktif()) return tambahSesiFS(data);
   const id = `s-${Date.now()}`;
   sesiState = [...sesiState, { id, status: "belum_dibuka", ...data }];
   emit();
@@ -164,17 +219,20 @@ export async function ubahSesi(
   id: string,
   data: Partial<DataSesi>,
 ): Promise<void> {
+  if (sesiAktif()) return ubahSesiFS(id, data);
   sesiState = sesiState.map((s) => (s.id === id ? { ...s, ...data } : s));
   emit();
 }
 
 export async function hapusSesi(id: string): Promise<void> {
+  if (sesiAktif()) return hapusSesiFS(id);
   sesiState = sesiState.filter((s) => s.id !== id);
   emit();
 }
 
 /** FR-05: membuka sesi. Menolak jika sesi tidak ditemukan, sudah dibuka, atau sudah ditutup. */
 export async function bukaSesi(id: string, catatan?: string): Promise<void> {
+  if (sesiAktif()) return bukaSesiFS(id, catatan);
   const sesi = sesiState.find((s) => s.id === id);
   if (!sesi) throw new Error("Sesi tidak ditemukan.");
   if (sesi.status === "dibuka") throw new Error("Sesi ini sudah dibuka.");
@@ -195,6 +253,7 @@ export async function bukaSesi(id: string, catatan?: string): Promise<void> {
 
 /** FR-05: menutup sesi. Menolak jika sesi tidak ditemukan, belum dibuka, atau sudah ditutup. */
 export async function tutupSesi(id: string): Promise<void> {
+  if (sesiAktif()) return tutupSesiFS(id);
   const sesi = sesiState.find((s) => s.id === id);
   if (!sesi) throw new Error("Sesi tidak ditemukan.");
   if (sesi.status === "belum_dibuka")
@@ -337,7 +396,8 @@ export const sisaSimulasi = (sesiId: string) =>
   POOL_SIMULASI.length - (rekapTambahan[sesiId]?.length ?? 0);
 
 export function resetDemo() {
-  sesiState = buatSesiAwal();
+  // Saat Firestore aktif, data sesi di server tidak ikut dihapus oleh reset demo.
+  if (!sesiAktif()) sesiState = buatSesiAwal();
   Object.keys(rekapTambahan).forEach((k) => delete rekapTambahan[k]);
   resetPresensiDemo();
   resetIzinDemo();

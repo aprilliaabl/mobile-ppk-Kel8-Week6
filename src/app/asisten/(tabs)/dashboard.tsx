@@ -29,11 +29,12 @@ export default function DashboardAsisten() {
   const sesiList = useSesiList();
 
   const urut = useMemo(() => [...sesiList].sort((a, b) => a.waktuMulai.localeCompare(b.waktuMulai)), [sesiList]);
-  const [pilihId, setPilihId] = useState<string>(() => (urut.find((s) => s.status === 'dibuka') ?? urut[0])?.id ?? '');
+  const [pilihId, setPilihId] = useState<string>('');
   const [cari, setCari] = useState('');
   const [filter, setFilter] = useState<FilterRekap>('SEMUA');
 
-  const sesi = urut.find((s) => s.id === pilihId);
+  // Jika belum ada pilihan (atau sesi terpilih sudah dihapus), pakai sesi yang sedang dibuka / sesi pertama.
+  const sesi = urut.find((s) => s.id === pilihId) ?? urut.find((s) => s.status === 'dibuka') ?? urut[0];
   const rekap = useRekapSesi(sesi?.id, 'asisten');
   const daftarIzin = useDaftarIzinAsisten(sesi?.id, 'asisten');
   const izinPending = daftarIzin.filter((i) => i.status === 'pending').length;
@@ -68,7 +69,7 @@ export default function DashboardAsisten() {
           <Text style={styles.label}>PILIH SESI</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {urut.map((s) => {
-              const aktif = s.id === pilihId;
+              const aktif = s.id === sesi?.id;
               return (
                 <Pressable key={s.id} onPress={() => pilihSesi(s.id)} style={[styles.chip, aktif && styles.chipAktif]} accessibilityRole="button">
                   <Text style={[styles.chipText, aktif && styles.chipTextAktif]}>{s.nama.replace('Praktikum ', '')} • {s.kelas}</Text>
