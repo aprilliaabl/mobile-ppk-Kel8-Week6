@@ -22,6 +22,7 @@ export interface UserDummy {
   id: string;
   nama: string;
   nim?: string;
+  kelas?: string;
   role: Role;
 }
 

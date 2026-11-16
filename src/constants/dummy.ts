@@ -31,7 +31,7 @@ import type {
 
 export const userDummy: UserDummy[] = [
   { id: "u-1", nama: "Dada", role: "asisten" },
-  { id: "u-2", nama: "Didi", nim: "22/001", role: "praktikan" },
+  { id: "u-2", nama: "Didi", nim: "22/001", kelas: "IF-2B", role: "praktikan" },
 ];
 
 /** Waktu dibuat relatif terhadap hari ini supaya label "Hari ini / Besok" selalu relevan. */
@@ -200,6 +200,21 @@ export function useSesiStatus(): { loading: boolean; error: string | null } {
 
 export function useSesiList(): Sesi[] {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
+}
+
+/**
+ * FR-06: apakah sesi berkaitan dengan praktikan, yaitu kelasnya sama.
+ * Jika kelas praktikan belum diketahui, semua sesi dianggap berkaitan.
+ */
+export function sesiBerkaitan(sesi: Sesi, praktikan?: UserDummy): boolean {
+  if (!praktikan?.kelas) return true;
+  return sesi.kelas.trim().toUpperCase() === praktikan.kelas.trim().toUpperCase();
+}
+
+/** FR-06: daftar sesi yang berkaitan dengan praktikan (real-time). */
+export function useSesiPraktikan(praktikan?: UserDummy): Sesi[] {
+  const semua = useSesiList();
+  return semua.filter((s) => sesiBerkaitan(s, praktikan));
 }
 
 export function useSesi(id: string | undefined): Sesi | undefined {
