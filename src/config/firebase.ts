@@ -18,6 +18,7 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -47,9 +48,13 @@ if (isFirebaseConfigured) {
     dbInstance = getFirestore(appInstance);
 
     try {
-      authInstance = initializeAuth(appInstance, {
-        persistence: getReactNativePersistence(AsyncStorage),
-      });
+      authInstance = Platform.OS === 'web'
+        ? getAuth(appInstance)
+        : initializeAuth(appInstance, {
+            persistence: typeof getReactNativePersistence === 'function'
+              ? getReactNativePersistence(AsyncStorage)
+              : undefined,
+          });
     } catch (error) {
       const firebaseError = error as { code?: string };
 
