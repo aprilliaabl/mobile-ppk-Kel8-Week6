@@ -1,0 +1,17 @@
+# Dependencies & caches
+node_modules/
+.expo/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Generated native folders (EAS will generate these in the cloud)
+/android
+/ios
+
+# Mac & Temp
+.DS_Store
+*.orig.*
+
+# Note: google-services.json and .env are intentionally NOT ignored here
+# so that EAS build server receives the Firebase credentials.
