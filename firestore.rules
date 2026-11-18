@@ -1,52 +1,156 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Memastikan pengguna sudah terautentikasi.
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    // Memastikan dokumen profil pengguna tersedia dan akunnya aktif.
+    function isActiveUser() {
+      return isAuthenticated()
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        )
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.accountStatus == 'active';
     }
 
+    // Pemeriksaan hak akses berdasarkan role dan status akun.
     function isAsisten() {
-      return isAuthenticated() && getUserRole() == 'asisten';
+      return isActiveUser()
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.role == 'asisten';
     }
 
     function isPraktikan() {
-      return isAuthenticated() && getUserRole() == 'praktikan';
+      return isActiveUser()
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.role == 'praktikan';
     }
 
+    // FR-01 dan FR-02: Pengelolaan profil dan otorisasi pengguna.
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+
+      // Pengguna dapat membaca profil sendiri.
+      // Asisten aktif dapat membaca profil pengguna untuk operasional.
+      allow get: if isAuthenticated()
+        && (request.auth.uid == userId || isAsisten());
+
+      // Hanya Asisten aktif yang dapat membaca daftar pengguna.
+      allow list: if isAsisten();
+
+      // Registrasi hanya boleh membuat akun Praktikan.
+      // Permohonan Asisten harus berstatus pending.
+      allow create: if isAuthenticated()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll([
+          'uid',
+          'nama',
+          'email',
+          'role',
+          'requestedRole',
+          'accountStatus',
+          'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'nama',
+          'email',
+          'role',
+          'requestedRole',
+          'accountStatus',
+          'createdAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.nama is string
+        && request.resource.data.nama.size() > 0
+        && request.resource.data.nama.size() <= 100
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        && request.resource.data.role == 'praktikan'
+        && request.resource.data.requestedRole in [
+          'praktikan',
+          'asisten'
+        ]
+        && request.resource.data.createdAt is timestamp
+        && (
+          (
+            request.resource.data.requestedRole == 'praktikan'
+            && request.resource.data.accountStatus == 'active'
+          )
+          ||
+          (
+            request.resource.data.requestedRole == 'asisten'
+            && request.resource.data.accountStatus == 'pending'
+          )
+        );
+
+      // Pengguna tidak boleh mengubah identitas dan hak aksesnya sendiri.
+      allow update: if isAuthenticated()
+        && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data)
+          .affectedKeys()
+          .hasAny([
+            'uid',
+            'email',
+            'role',
+            'requestedRole',
+            'accountStatus',
+            'createdAt'
+          ]);
+
+      // Profil tidak boleh dihapus melalui aplikasi.
       allow delete: if false;
     }
 
+    // FR-04 dan FR terkait: Pengelolaan sesi praktikum.
     match /sesi/{sesiId} {
-      allow read: if isAuthenticated();
+      allow read: if isActiveUser();
       allow create, update, delete: if isAsisten();
     }
 
-    // FR-07 & FR-08: Attendance submission and real-time recap
+    // FR-07 dan FR-08: Presensi praktikan.
     match /presensi/{presensiId} {
-      allow read: if isAsisten() || (isAuthenticated() && resource.data.praktikanId == request.auth.uid);
+
+      allow read: if isAsisten()
+        || (
+          isPraktikan()
+          && resource.data.praktikanId == request.auth.uid
+        );
 
       allow create: if isPraktikan()
         && request.resource.data.praktikanId == request.auth.uid
         && request.resource.data.sesiId is string
-        && presensiId == request.resource.data.sesiId + '_' + request.auth.uid
-        && !exists(/databases/$(database)/documents/presensi/$(presensiId))
-        && get(/databases/$(database)/documents/sesi/$(request.resource.data.sesiId)).data.status == 'dibuka'
+        && presensiId == request.resource.data.sesiId
+          + '_'
+          + request.auth.uid
+        && !exists(
+          /databases/$(database)/documents/presensi/$(presensiId)
+        )
+        && get(
+          /databases/$(database)/documents/sesi/$(request.resource.data.sesiId)
+        ).data.status == 'dibuka'
         && request.resource.data.status == 'HADIR';
 
+      // Presensi yang sudah dibuat tidak dapat diubah atau dihapus.
       allow update, delete: if false;
     }
 
-    // FR-11, FR-12, FR-13, FR-14: Absence permission submission & assistant approval workflow
+    // FR-11 sampai FR-14: Pengajuan izin dan persetujuan Asisten.
     match /izin/{izinId} {
-      allow read: if isAsisten() || (isAuthenticated() && resource.data.praktikanId == request.auth.uid);
+
+      allow read: if isAsisten()
+        || (
+          isPraktikan()
+          && resource.data.praktikanId == request.auth.uid
+        );
 
       allow create: if isPraktikan()
         && request.resource.data.praktikanId == request.auth.uid
@@ -54,16 +158,25 @@ service cloud.firestore {
         && request.resource.data.alasan is string
         && request.resource.data.alasan.size() > 0
         && request.resource.data.status == 'pending'
-        && izinId == request.resource.data.sesiId + '_' + request.auth.uid
-        && !exists(/databases/$(database)/documents/izin/$(izinId));
+        && izinId == request.resource.data.sesiId
+          + '_'
+          + request.auth.uid
+        && !exists(
+          /databases/$(database)/documents/izin/$(izinId)
+        );
 
-      // FR-13: Only assistants can approve or reject, and only when current status is 'pending'
       allow update: if isAsisten()
         && resource.data.status == 'pending'
-        && request.resource.data.status in ['disetujui', 'ditolak']
-        && request.resource.data.praktikanId == resource.data.praktikanId
-        && request.resource.data.sesiId == resource.data.sesiId
-        && request.resource.data.alasan == resource.data.alasan;
+        && request.resource.data.status in [
+          'disetujui',
+          'ditolak'
+        ]
+        && request.resource.data.praktikanId
+          == resource.data.praktikanId
+        && request.resource.data.sesiId
+          == resource.data.sesiId
+        && request.resource.data.alasan
+          == resource.data.alasan;
 
       allow delete: if false;
     }
