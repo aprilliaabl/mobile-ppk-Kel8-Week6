@@ -23,6 +23,8 @@ const MAP = {
   kompas: { ios: 'location.north.circle.fill', android: 'my_location' },
   peringatan: { ios: 'exclamationmark.triangle.fill', android: 'warning' },
   segarkan: { ios: 'arrow.clockwise', android: 'refresh' },
+  lab: { ios: 'building.2.fill', android: 'domain' },
+  peta: { ios: 'map.fill', android: 'map' },
 } as const;
 
 export type NamaIkon = keyof typeof MAP;
