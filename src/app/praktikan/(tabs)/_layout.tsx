@@ -15,6 +15,7 @@ export default function PraktikanTabs() {
       }}
     >
       <Tabs.Screen name="beranda" options={{ title: 'Jadwal', tabBarIcon: ({ color }) => <Ikon nama="jadwal" color={color} size={24} /> }} />
+      <Tabs.Screen name="presensi" options={{ title: 'Presensi', tabBarIcon: ({ color }) => <Ikon nama="presensi" color={color} size={24} /> }} />
       <Tabs.Screen name="riwayat" options={{ title: 'Riwayat', tabBarIcon: ({ color }) => <Ikon nama="riwayat" color={color} size={24} /> }} />
       <Tabs.Screen name="akun" options={{ title: 'Akun', tabBarIcon: ({ color }) => <Ikon nama="akun" color={color} size={24} /> }} />
     </Tabs>
