@@ -20,6 +20,7 @@ const MAP = {
   cari: { ios: 'magnifyingglass', android: 'search' },
   tambah: { ios: 'person.badge.plus', android: 'person_add' },
   lab: { ios: 'building.2.fill', android: 'domain' },
+  peta: { ios: 'map.fill', android: 'map' },
 } as const;
 
 export type NamaIkon = keyof typeof MAP;
