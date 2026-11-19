@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, useWindowDimensions, KeyboardTypeOptions, Pressable } from 'react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
@@ -18,22 +18,24 @@ interface Props {
 
 export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
   const { height } = useWindowDimensions();
-  const [v, setV] = useState<FormSesiValues>(formKosong());
+  const [v, setV] = useState<FormSesiValues>(() => (sesi ? dariSesi(sesi) : formKosong()));
   const [err, setErr] = useState<ErrorSesi>({});
   const [loading, setLoading] = useState(false);
   const [gagal, setGagal] = useState<string | null>(null);
+  const [wasVisible, setWasVisible] = useState(false);
 
   const labList = useLaboratoriumList();
 
   // Isi ulang form setiap kali dibuka
-  useEffect(() => {
-    if (visible) {
-      setV(sesi ? dariSesi(sesi) : formKosong());
-      setErr({});
-      setGagal(null);
-      setLoading(false);
-    }
-  }, [visible, sesi]);
+  if (visible && !wasVisible) {
+    setWasVisible(true);
+    setV(sesi ? dariSesi(sesi) : formKosong());
+    setErr({});
+    setGagal(null);
+    setLoading(false);
+  } else if (!visible && wasVisible) {
+    setWasVisible(false);
+  }
 
   const set = (k: keyof FormSesiValues) => (t: string) => {
     setV((p) => ({ ...p, [k]: t }));
@@ -49,7 +51,7 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
         ruang: selected.nama,
         latitude: selected.latitude,
         longitude: selected.longitude,
-        radius: selected.radius ?? 10,
+        radius: selected.radius ?? 25, // konsisten dengan validasiSesi & dariDoc
       }));
       if (err.ruang) setErr((p) => ({ ...p, ruang: undefined }));
     }
@@ -113,7 +115,7 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
                     {lab.kode || lab.nama}
                   </Text>
                   <Text style={[styles.labPillSub, aktif && styles.labPillSubAktif]}>
-                    r: {lab.radius ?? 10}m
+                    r: {lab.radius}m
                   </Text>
                 </Pressable>
               );
@@ -127,7 +129,7 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
         {v.latitude !== undefined && v.longitude !== undefined && (
           <View style={styles.geoInfo}>
             <Text style={styles.geoText}>
-              📍 Koordinat: {v.latitude.toFixed(6)}, {v.longitude.toFixed(6)} • Radius: {v.radius ?? 10} meter
+              📍 Koordinat: {v.latitude.toFixed(6)}, {v.longitude.toFixed(6)} • Radius: {v.radius ?? 25} meter
             </Text>
           </View>
         )}

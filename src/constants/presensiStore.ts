@@ -8,8 +8,18 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
+import { auth, COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
 import type { Sesi, UserDummy } from './types';
+
+export interface InfoLokasiPresensi {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  jarakMeter: number;
+  radiusMeter: number;
+  labId?: string;
+  namaLab?: string;
+}
 
 export interface CatatanPresensi {
   /** Deterministic ID: `${sesiId}_${praktikanId}` */
@@ -24,6 +34,7 @@ export interface CatatanPresensi {
   waktuKehadiran: string; // contoh: "08.10.25"
   createdAtIso?: string;
   status: 'HADIR';
+  lokasi?: InfoLokasiPresensi;
 }
 
 export interface HasilSubmitPresensi {
@@ -136,14 +147,19 @@ export function catatPresensi(
 export async function submitPresensi(params: {
   sesi: Sesi | undefined;
   praktikan: UserDummy | undefined;
+  lokasi?: InfoLokasiPresensi;
+  requireAuth?: boolean;
 }): Promise<HasilSubmitPresensi> {
-  const { sesi, praktikan } = params;
+  const { sesi, praktikan, lokasi, requireAuth = false } = params;
 
   if (!sesi || !sesi.id?.trim()) {
     return { ok: false, error: 'Sesi praktikum tidak ditemukan.' };
   }
   if (!praktikan || !praktikan.id?.trim() || praktikan.role !== 'praktikan') {
-    return { ok: false, error: 'Hanya praktikan yang berwenang melakukan presensi.' };
+    return { ok: false, error: 'User tidak terautentikasi atau bukan praktikan.' };
+  }
+  if (requireAuth && (!auth || !auth.currentUser)) {
+    return { ok: false, error: 'Sesi autentikasi tidak ditemukan. Silakan login terlebih dahulu.' };
   }
   if (sesi.status !== 'dibuka') {
     return {
@@ -155,11 +171,15 @@ export async function submitPresensi(params: {
     };
   }
 
-  const docId = buatIdPresensi(sesi.id, praktikan.id);
+  // Jika user login via Firebase Auth, gunakan UID yang terautentikasi untuk memenuhi firestore.rules
+  const effectivePraktikanId =
+    isFirebaseConfigured && auth?.currentUser ? auth.currentUser.uid : praktikan.id;
+
+  const docId = buatIdPresensi(sesi.id, effectivePraktikanId);
   if (inFlightKeys.has(docId)) {
     return { ok: false, error: 'Permintaan presensi sedang diproses.' };
   }
-  if (cekSudahPresensi(sesi.id, praktikan.id)) {
+  if (cekSudahPresensi(sesi.id, effectivePraktikanId)) {
     return { ok: false, error: 'Kamu sudah tercatat hadir pada sesi ini.' };
   }
 
@@ -171,16 +191,22 @@ export async function submitPresensi(params: {
       sesiId: sesi.id,
       namaSesi: sesi.nama,
       kelas: sesi.kelas,
-      praktikanId: praktikan.id,
+      praktikanId: effectivePraktikanId,
       namaPraktikan: praktikan.nama,
       nimPraktikan: praktikan.nim ?? '22/001',
       tanggal: formatTanggalPresensi(now),
       waktuKehadiran: formatJamPresensi(now),
       createdAtIso: now.toISOString(),
       status: 'HADIR',
+      ...(lokasi ? { lokasi } : {}),
     };
 
-    if (isFirebaseConfigured && db) {
+    // Tulis ke Firestore apabila Firebase aktif dan sesi ini bukan data demo lokal (atau user sedang login Firebase)
+    const isDemoLocalSesi = /^s-\d+$/.test(sesi.id);
+    if (isFirebaseConfigured && db && (auth?.currentUser || !isDemoLocalSesi)) {
+      if (!auth?.currentUser) {
+        throw new Error('UNAUTHENTICATED');
+      }
       const firestoreDb = db;
       await runTransaction(firestoreDb, async (tx) => {
         const sesiRef = doc(firestoreDb, COLLECTIONS.SESI, sesi.id);
@@ -191,9 +217,13 @@ export async function submitPresensi(params: {
           tx.get(presensiRef),
         ]);
 
-        if (sesiSnap.exists()) {
+        if (!sesiSnap.exists()) {
+          if (!isDemoLocalSesi) {
+            throw new Error('SESSION_NOT_FOUND');
+          }
+        } else {
           const serverStatus = sesiSnap.data()?.status;
-          if (serverStatus && serverStatus !== 'dibuka') {
+          if (serverStatus !== 'dibuka') {
             throw new Error('SESSION_NOT_OPEN');
           }
         }
@@ -211,6 +241,12 @@ export async function submitPresensi(params: {
     return catatPresensi(record, sesi.status);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : '';
+    if (msg === 'UNAUTHENTICATED') {
+      return { ok: false, error: 'Presensi ditolak karena pengguna belum terautentikasi.' };
+    }
+    if (msg === 'SESSION_NOT_FOUND') {
+      return { ok: false, error: 'Sesi praktikum tidak ditemukan di server.' };
+    }
     if (msg === 'SESSION_NOT_OPEN') {
       return { ok: false, error: 'Presensi ditolak karena sesi di server tidak sedang dibuka.' };
     }

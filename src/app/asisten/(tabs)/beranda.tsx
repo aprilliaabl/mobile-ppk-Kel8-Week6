@@ -4,11 +4,11 @@ import { JadwalList } from '../../../features/session/components/JadwalList';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
 import { Button } from '../../../components/Button';
 import { FormSesi } from '../../../components/FormSesi';
-import { tambahSesi, useSesiList, userDummy } from '../../../constants/dummy';
+import { tambahSesi, useCurrentUser, useSesiList } from '../../../constants/dummy';
 import { W } from '../../../constants/warna';
 
 export default function BerandaAsisten() {
-  const asisten = userDummy.find((u) => u.role === 'asisten')!;
+  const asisten = useCurrentUser('asisten');
   const sesiList = useSesiList();
   const [formOpen, setFormOpen] = useState(false);
   const hitung = (s: string) => sesiList.filter((x) => x.status === s).length;

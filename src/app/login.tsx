@@ -221,7 +221,7 @@ export default function Login() {
 
       <Pressable
         style={styles.registerLink}
-        onPress={() => router.push("/register")}
+        onPress={() => router.push('/register' as never)}
         disabled={loading}
       >
         <Text style={styles.registerText}>

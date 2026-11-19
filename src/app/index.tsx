@@ -31,8 +31,8 @@ export default function PilihRole() {
           <Text style={styles.authTitle}>Punya Akun Praktikum?</Text>
           <Text style={styles.authSubtitle}>Masuk atau daftar dengan akun Firebase untuk presensi real-time</Text>
           <View style={{ gap: 10, marginTop: 6 }}>
-            <Button label="Masuk dengan Akun Firebase" onPress={() => router.push('/login')} />
-            <Button label="Belum punya akun? Daftar Akun Baru" variant="outline" onPress={() => router.push('/register')} />
+            <Button label="Masuk dengan Akun Firebase" onPress={() => router.push('/login' as never)} />
+            <Button label="Belum punya akun? Daftar Akun Baru" variant="outline" onPress={() => router.push('/register' as never)} />
           </View>
         </View>
 

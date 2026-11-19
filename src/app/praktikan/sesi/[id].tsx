@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { sesiBerkaitan, useSesi, userDummy } from '../../../constants/dummy';
+import { sesiBerkaitan, useCurrentUser, useSesi } from '../../../constants/dummy';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { InfoRow } from '../../../components/InfoRow';
 import { Button } from '../../../components/Button';
@@ -12,7 +12,7 @@ import { EmptyState } from '../../../components/EmptyState';
 import { Ikon } from '../../../components/Ikon';
 import { TopBar } from '../../../components/TopBar';
 import { formatJamRentang, formatTanggalPanjang } from '../../../constants/format';
-import { submitPresensi, usePresensiPraktikanSesi } from '../../../constants/presensiStore';
+import { usePresensiPraktikanSesi } from '../../../constants/presensiStore';
 import { ajukanIzin, useIzinSesiPraktikan } from '../../../constants/izinStore';
 import { MAX_W, W } from '../../../constants/warna';
 
@@ -24,7 +24,7 @@ export default function DetailSesiPraktikan() {
   const lebar = width >= 820;
 
   const sesi = useSesi(id);
-  const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
+  const praktikan = useCurrentUser('praktikan');
 
   // Cek apakah sudah pernah presensi di sesi ini secara reaktif (FR-07: tidak boleh dua kali)
   const existing = usePresensiPraktikanSesi(sesi?.id, praktikan.id);
@@ -35,11 +35,7 @@ export default function DetailSesiPraktikan() {
   const existingIzin = useIzinSesiPraktikan(sesi?.id, praktikan.id);
   const hasRequestedIzin = !!existingIzin;
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [setuju, setSetuju] = useState(false); // pilihan di form konfirmasi
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false); // umpan balik berhasil (FR-08)
+  const [showModal, setShowModal] = useState(false); // umpan balik bukti kehadiran (FR-08)
 
   // State form pengajuan izin (FR-11)
   const [izinOpen, setIzinOpen] = useState(false);
@@ -59,7 +55,7 @@ export default function DetailSesiPraktikan() {
     );
   }
 
-    // FR-06: sesi kelas lain tidak ditampilkan kepada praktikan ini.
+  // FR-06: sesi kelas lain tidak ditampilkan kepada praktikan ini.
   if (!sesiBerkaitan(sesi, praktikan)) {
     return (
       <View style={styles.root}>
@@ -71,22 +67,8 @@ export default function DetailSesiPraktikan() {
     );
   }
 
-  const handlePresensi = async () => {
-    if (!setuju || submitting) return;
-    setErrorMsg(null);
-    setSubmitting(true);
-
-    const hasil = await submitPresensi({ sesi, praktikan });
-    setSubmitting(false);
-
-    if (!hasil.ok) {
-      setErrorMsg(hasil.error ?? 'Presensi tidak dapat diproses.');
-      return;
-    }
-
-    setFormOpen(false);
-    setSetuju(false);
-    setShowModal(true);
+  const bukaHalamanPresensi = () => {
+    router.push({ pathname: '/praktikan/presensi', params: { sesiId: sesi.id } } as never);
   };
 
   const handleAjukanIzin = async () => {
@@ -212,7 +194,7 @@ export default function DetailSesiPraktikan() {
         <View style={styles.footInner}>
           {hasAttended ? (
             <>
-              <Button label="Sudah Presensi" onPress={() => {}} disabled />
+              <Button label="Sudah Presensi (Buka Halaman Presensi)" variant="outline" onPress={bukaHalamanPresensi} />
               <Button label="Lihat Bukti Kehadiran" variant="ghost" onPress={() => setShowModal(true)} />
             </>
           ) : hasRequestedIzin ? (
@@ -223,10 +205,9 @@ export default function DetailSesiPraktikan() {
           ) : (
             <>
               <Button
-                label={sesi.status === 'dibuka' ? 'Presensi Sekarang' : sesi.status === 'ditutup' ? 'Sesi Ditutup' : 'Presensi Belum Tersedia'}
-                variant="success"
-                onPress={() => setFormOpen(true)}
-                disabled={sesi.status !== 'dibuka'}
+                label={sesi.status === 'dibuka' ? 'Buka Halaman Presensi' : sesi.status === 'ditutup' ? 'Sesi Ditutup (Lihat Status Presensi)' : 'Lihat Status di Halaman Presensi'}
+                variant={sesi.status === 'dibuka' ? 'success' : 'outline'}
+                onPress={bukaHalamanPresensi}
               />
               {sesi.status !== 'ditutup' && (
                 <Button
@@ -242,32 +223,6 @@ export default function DetailSesiPraktikan() {
           )}
         </View>
       </View>
-
-      {/* Bottom sheet + form konfirmasi presensi */}
-      <BottomSheet visible={formOpen} onClose={() => { setFormOpen(false); setErrorMsg(null); }} title="Konfirmasi presensi">
-        <View style={styles.summary}>
-          <Text style={styles.sumNama}>{praktikan.nama}{praktikan.nim ? ` (${praktikan.nim})` : ''}</Text>
-          <Text style={styles.sumSub}>{sesi.nama} • Kelas {sesi.kelas}</Text>
-        </View>
-        <Pressable onPress={() => setSetuju((v) => !v)} style={styles.checkRow} accessibilityRole="checkbox" accessibilityState={{ checked: setuju }}>
-          <View style={[styles.checkbox, setuju && styles.checkboxOn]}>
-            {setuju && <Text style={styles.checkMark}>✓</Text>}
-          </View>
-          <Text style={styles.checkText}>Saya hadir dan mengikuti praktikum di {sesi.ruang}.</Text>
-        </Pressable>
-        {!!errorMsg && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{errorMsg}</Text>
-          </View>
-        )}
-        <Button
-          label={submitting ? 'Memproses...' : 'Kirim Presensi'}
-          variant="success"
-          onPress={handlePresensi}
-          disabled={!setuju || submitting || sesi.status !== 'dibuka' || hasAttended}
-        />
-        <Button label="Batal" variant="ghost" onPress={() => { setFormOpen(false); setErrorMsg(null); }} />
-      </BottomSheet>
 
       {/* Bottom sheet + form pengajuan izin ketidakhadiran (FR-11) */}
       <BottomSheet
