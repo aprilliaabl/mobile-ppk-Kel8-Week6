@@ -112,9 +112,23 @@ export default function Login() {
 
       // 4. Mengarahkan pengguna berdasarkan role yang telah disetujui.
       if (userData.role === 'asisten') {
-        router.replace('/asisten/beranda');
+        const { setCurrentUser } = await import('../constants/dummy');
+        setCurrentUser({
+          id: user.uid,
+          nama: userData.nama || user.email || 'Asisten',
+          role: 'asisten',
+        });
+        router.replace('/asisten/(tabs)/beranda' as never);
       } else if (userData.role === 'praktikan') {
-        router.replace('/praktikan/beranda');
+        const { setCurrentUser } = await import('../constants/dummy');
+        setCurrentUser({
+          id: user.uid,
+          nama: userData.nama || user.email || 'Praktikan',
+          nim: userData.nim || '22/001',
+          kelas: userData.kelas || 'IF-2B',
+          role: 'praktikan',
+        });
+        router.replace('/praktikan/(tabs)/beranda' as never);
       } else {
         await signOut(auth);
         isAuthenticated = false;

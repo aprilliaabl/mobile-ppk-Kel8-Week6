@@ -82,6 +82,7 @@ export default function Register() {
       createdUser = userCredential.user;
 
       const isAsistenRequest = role === 'asisten';
+      const userRole = isAsistenRequest ? 'asisten' : 'praktikan';
 
       await setDoc(
         doc(db, COLLECTIONS.USERS, createdUser.uid),
@@ -90,31 +91,28 @@ export default function Register() {
           nama: namaBersih,
           email: emailBersih,
 
-          // Hak akses awal selalu praktikan.
-          role: 'praktikan',
+          // Role akun
+          role: userRole,
 
           // Peran yang dipilih saat registrasi.
           requestedRole: role,
 
-          // Permohonan asisten harus disetujui terlebih dahulu.
-          accountStatus: isAsistenRequest ? 'pending' : 'active',
+          // Status akun: langsung aktif agar bisa login & digunakan saat demo praktikum
+          accountStatus: 'active',
 
           createdAt: serverTimestamp(),
         }
       );
 
       if (isAsistenRequest) {
-        // Akun pending tidak dibiarkan masuk ke aplikasi.
-        await signOut(auth);
-
         Alert.alert(
-          'Permohonan Terkirim',
-          'Akun berhasil dibuat. Permohonan sebagai Asisten menunggu persetujuan administrator.'
+          'Registrasi Berhasil',
+          `Akun Asisten untuk ${namaBersih} berhasil didaftarkan! Silakan login untuk mengelola sesi.`
         );
       } else {
         Alert.alert(
           'Registrasi Berhasil',
-          `Selamat datang, ${namaBersih}! Akun Praktikan kamu berhasil dibuat.`
+          `Selamat datang, ${namaBersih}! Akun Praktikan kamu berhasil dibuat. Silakan login.`
         );
       }
 

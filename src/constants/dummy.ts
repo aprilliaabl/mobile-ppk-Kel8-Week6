@@ -35,6 +35,16 @@ export const userDummy: UserDummy[] = [
   { id: "u-2", nama: "Didi", nim: "22/001", kelas: "IF-2B", role: "praktikan" },
 ];
 
+export function setCurrentUser(user: Partial<UserDummy> & { role: Role }) {
+  const target = userDummy.find((u) => u.role === user.role);
+  if (target) {
+    if (user.id) target.id = user.id;
+    if (user.nama) target.nama = user.nama;
+    if (user.nim !== undefined) target.nim = user.nim;
+    if (user.kelas !== undefined) target.kelas = user.kelas;
+  }
+}
+
 /** Waktu dibuat relatif terhadap hari ini supaya label "Hari ini / Besok" selalu relevan. */
 function at(dayOffset: number, jam: number, menit: number): string {
   const d = new Date();
