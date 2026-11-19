@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { W } from '../constants/warna';
@@ -15,12 +15,15 @@ const native = Platform.OS !== 'web';
 /** Panel yang naik dari bawah layar, dipakai untuk form dan konfirmasi. */
 export function BottomSheet({ visible, onClose, title, children }: Props) {
   const insets = useSafeAreaInsets();
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
   const [mounted, setMounted] = useState(visible);
+
+  if (visible && !mounted) {
+    setMounted(true);
+  }
 
   useEffect(() => {
     if (visible) {
-      setMounted(true);
       Animated.timing(anim, { toValue: 1, duration: 240, useNativeDriver: native }).start();
     } else {
       Animated.timing(anim, { toValue: 0, duration: 180, useNativeDriver: native }).start(({ finished }) => {

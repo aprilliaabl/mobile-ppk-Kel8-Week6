@@ -8,7 +8,7 @@ import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, LoadingState } from '../../../components/StateView';
 import { Ikon } from '../../../components/Ikon';
 import { formatJamRentang, formatTanggal } from '../../../constants/format';
-import { getRekapSesi, muatUlangSesi, sesiBerkaitan, useSesiList, useSesiStatus, userDummy } from '../../../constants/dummy';
+import { getRekapSesi, muatUlangSesi, sesiBerkaitan, useCurrentUser, useSesiList, useSesiStatus } from '../../../constants/dummy';
 import { cekSudahPresensi } from '../../../constants/presensiStore';
 import { useRiwayatIzinPraktikan } from '../../../constants/izinStore';
 import { MAX_W, W } from '../../../constants/warna';
@@ -41,22 +41,23 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
   const [tick, setTick] = useState(0);
 
   // Banner offline baru tampil jika data dari cache bertahan >1,5 detik, supaya tidak berkedip saat aplikasi baru dibuka.
-  const [offlineLama, setOfflineLama] = useState(false);
+  const [offlineDelayPassed, setOfflineDelayPassed] = useState(false);
   useEffect(() => {
-    if (!statusSesi.dariCache) {
-      setOfflineLama(false);
-      return;
-    }
-    const timer = setTimeout(() => setOfflineLama(true), 1500);
-    return () => clearTimeout(timer);
+    if (!statusSesi.dariCache) return;
+    const timer = setTimeout(() => setOfflineDelayPassed(true), 1500);
+    return () => {
+      clearTimeout(timer);
+      setOfflineDelayPassed(false);
+    };
   }, [statusSesi.dariCache]);
+  const offlineLama = statusSesi.dariCache && offlineDelayPassed;
 
   // Segarkan daftar saat layar kembali difokuskan (mis. setelah presensi / rekap berubah).
   useFocusEffect(useCallback(() => setTick((t) => t + 1), []));
 
   // HP: 1 kolom, tablet: 2 kolom, laptop: 3 kolom
   const cols = width >= 1000 ? 3 : width >= 640 ? 2 : 1;
-  const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
+  const praktikan = useCurrentUser('praktikan');
   const izinPraktikan = useRiwayatIzinPraktikan(praktikan.id);
 
   // FR-06: praktikan hanya melihat sesi yang berkaitan dengan kelasnya. Asisten melihat semua sesi.

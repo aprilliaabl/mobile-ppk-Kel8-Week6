@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import type { PengajuanIzin } from '../constants/types';
-import { userDummy } from '../constants/dummy';
+import { useCurrentUser } from '../constants/dummy';
 import { prosesKeputusanIzin } from '../constants/izinStore';
 import { inisial } from '../constants/format';
 import { W, warnaAvatar } from '../constants/warna';
@@ -38,7 +38,7 @@ function warnaKategoriAI(kategori?: string) {
  * FR-13: Komponen pengelolaan pengajuan izin untuk asisten beserta referensi klasifikasi AI.
  */
 export function DaftarIzinAsisten({ data, tampilkanInfoSesi = false }: Props) {
-  const asisten = userDummy.find((u) => u.role === 'asisten');
+  const asisten = useCurrentUser('asisten');
   const [targetModal, setTargetModal] = useState<{
     izin: PengajuanIzin;
     keputusan: 'disetujui' | 'ditolak';
@@ -284,3 +284,4 @@ const styles = StyleSheet.create({
   },
   processedText: { fontSize: 12, fontWeight: '700', color: W.sub },
 });
+

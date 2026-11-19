@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, useWindowDimensions, KeyboardTypeOptions } from 'react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
@@ -17,20 +17,22 @@ interface Props {
 
 export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
   const { height } = useWindowDimensions();
-  const [v, setV] = useState<FormSesiValues>(formKosong());
+  const [v, setV] = useState<FormSesiValues>(() => (sesi ? dariSesi(sesi) : formKosong()));
   const [err, setErr] = useState<ErrorSesi>({});
   const [loading, setLoading] = useState(false);
   const [gagal, setGagal] = useState<string | null>(null);
+  const [wasVisible, setWasVisible] = useState(false);
 
   // Isi ulang form setiap kali dibuka
-  useEffect(() => {
-    if (visible) {
-      setV(sesi ? dariSesi(sesi) : formKosong());
-      setErr({});
-      setGagal(null);
-      setLoading(false);
-    }
-  }, [visible, sesi]);
+  if (visible && !wasVisible) {
+    setWasVisible(true);
+    setV(sesi ? dariSesi(sesi) : formKosong());
+    setErr({});
+    setGagal(null);
+    setLoading(false);
+  } else if (!visible && wasVisible) {
+    setWasVisible(false);
+  }
 
   const set = (k: keyof FormSesiValues) => (t: string) => {
     setV((p) => ({ ...p, [k]: t }));
