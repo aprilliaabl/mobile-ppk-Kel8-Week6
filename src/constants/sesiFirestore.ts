@@ -76,6 +76,7 @@ function dariDoc(d: QueryDocumentSnapshot<DocumentData>): Sesi {
     nama: String(x.nama ?? ''),
     kelas: String(x.kelas ?? ''),
     ruang: String(x.ruang ?? ''),
+    labId: x.labId ? String(x.labId) : undefined,
     waktuMulai: String(x.waktuMulai ?? ''),
     waktuSelesai: String(x.waktuSelesai ?? ''),
     status: (x.status as StatusSesi) ?? 'belum_dibuka',

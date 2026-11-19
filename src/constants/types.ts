@@ -1,10 +1,22 @@
 export type StatusSesi = "belum_dibuka" | "dibuka" | "ditutup";
 
+export interface Laboratorium {
+  id: string;
+  nama: string;
+  gedung?: string;
+  latitude: number;
+  longitude: number;
+  /** Radius maksimal presensi dalam satuan meter */
+  radiusMeter: number;
+}
+
 export interface Sesi {
   id: string;
   nama: string;
   kelas: string;
   ruang: string;
+  /** ID referensi ke entitas Laboratorium (opsional, fallback dicocokkan lewat nama ruang) */
+  labId?: string;
   waktuMulai: string;
   waktuSelesai: string;
   status: StatusSesi;
