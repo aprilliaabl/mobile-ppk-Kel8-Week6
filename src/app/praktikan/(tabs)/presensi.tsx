@@ -1,22 +1,24 @@
 import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
+  ActivityIndicator,
   Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HeaderCard } from '../../../components/HeaderCard';
-import { StatusBadge } from '../../../components/StatusBadge';
-import { InfoRow } from '../../../components/InfoRow';
 import { Button } from '../../../components/Button';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { EmptyState } from '../../../components/EmptyState';
-import { ErrorState, LoadingState } from '../../../components/StateView';
+import { HeaderCard } from '../../../components/HeaderCard';
 import { Ikon } from '../../../components/Ikon';
+import { InfoRow } from '../../../components/InfoRow';
+import { PetaLokasiPresensi } from '../../../components/PetaLokasiPresensi';
+import { ErrorState, LoadingState } from '../../../components/StateView';
+import { StatusBadge } from '../../../components/StatusBadge';
 import {
   muatUlangSesi,
   sesiBerkaitan,
@@ -24,6 +26,12 @@ import {
   useSesiList,
   useSesiStatus,
 } from '../../../constants/dummy';
+import {
+  formatJamRentang,
+  formatTanggal,
+  formatTanggalPanjang,
+} from '../../../constants/format';
+import { useIzinSesiPraktikan } from '../../../constants/izinStore';
 import {
   cariLaboratoriumSesi,
   useLaboratoriumList,
@@ -33,19 +41,13 @@ import {
   submitPresensi,
   usePresensiPraktikanSesi,
 } from '../../../constants/presensiStore';
-import { useIzinSesiPraktikan } from '../../../constants/izinStore';
-import {
-  formatJamRentang,
-  formatTanggal,
-  formatTanggalPanjang,
-} from '../../../constants/format';
+import { validasiSyaratPresensi } from '../../../constants/validasiPresensi';
 import { MAX_W, W } from '../../../constants/warna';
+import { useLokasiPresensi } from '../../../hooks/use-lokasi-presensi';
 
 /**
- * FR-17: Halaman Presensi Khusus Praktikan.
- * Terpisah dari halaman detail sesi praktikum (/praktikan/sesi/[id]),
- * berfokus penuh pada pemilihan sesi yang dapat dipresensi, pemeriksaan status sesi & kehadiran,
- * serta pengiriman presensi.
+ * FR-17 & FR-18: Halaman Presensi Khusus dengan Validasi Sesi, Lokasi (GPS & MapView),
+ * dan Pencegahan Presensi Ganda.
  */
 export default function HalamanPresensiPraktikan() {
   const { sesiId: paramSesiId } = useLocalSearchParams<{ sesiId?: string }>();
@@ -59,6 +61,17 @@ export default function HalamanPresensiPraktikan() {
   const statusSesi = useSesiStatus();
   const daftarLab = useLaboratoriumList();
 
+  const {
+    statusLokasi,
+    koordinat,
+    errorDetail,
+    canAskAgain,
+    segarkanLokasi,
+    bukaPengaturanIzin,
+    setKoordinatSimulasi,
+    isSimulasi,
+  } = useLokasiPresensi();
+
   // Filter hanya sesi yang berkaitan dengan kelas praktikan (FR-06)
   const sesiKelas = useMemo(
     () =>
@@ -69,7 +82,9 @@ export default function HalamanPresensiPraktikan() {
   );
 
   const [manualId, setManualId] = useState<string | null>(null);
-  const [lastParamId, setLastParamId] = useState<string | undefined>(paramSesiId);
+  const [lastParamId, setLastParamId] = useState<string | undefined>(
+    paramSesiId
+  );
   const [setuju, setSetuju] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -83,11 +98,7 @@ export default function HalamanPresensiPraktikan() {
 
   const selectedId = manualId ?? paramSesiId ?? '';
 
-  // Tentukan sesi aktif yang sedang dipilih:
-  // 1. Berdasarkan selectedId / paramSesiId
-  // 2. Atau otomatis pilih sesi kelas praktikan yang sedang dibuka dan belum dihadiri
-  // 3. Atau sesi yang sedang dibuka
-  // 4. Atau sesi pertama di kelasnya
+  // Tentukan sesi aktif yang sedang dipilih
   const sesi = useMemo(() => {
     if (selectedId) {
       const dariSemua = semuaSesi.find((s) => s.id === selectedId);
@@ -111,8 +122,32 @@ export default function HalamanPresensiPraktikan() {
 
   const sudahHadir = !!catatanHadir;
   const sudahIzin = !!catatanIzin;
-  const sesiBuka = sesi?.status === 'dibuka';
   const milikKelas = sesi ? sesiBerkaitan(sesi, praktikan) : true;
+
+  // FR-18: Evaluasi 3 syarat presensi (Sesi, Lokasi/Radius, dan Status Kehadiran)
+  const validasi = useMemo(
+    () =>
+      validasiSyaratPresensi({
+        sesi,
+        praktikan,
+        sudahPresensi: sudahHadir,
+        waktuHadir: catatanHadir?.waktuKehadiran,
+        statusLokasi,
+        koordinat,
+        daftarLab,
+        errorLokasiDetail: errorDetail,
+      }),
+    [
+      sesi,
+      praktikan,
+      sudahHadir,
+      catatanHadir?.waktuKehadiran,
+      statusLokasi,
+      koordinat,
+      daftarLab,
+      errorDetail,
+    ]
+  );
 
   const pilihSesi = (id: string) => {
     setManualId(id);
@@ -121,11 +156,24 @@ export default function HalamanPresensiPraktikan() {
   };
 
   const handleKirimPresensi = async () => {
-    if (!sesi || !setuju || submitting || !sesiBuka || sudahHadir) return;
+    if (!sesi || !setuju || submitting) return;
     setErrorMsg(null);
-    setSubmitting(true);
 
-    const hasil = await submitPresensi({ sesi, praktikan });
+    if (!validasi.bolehPresensi) {
+      setErrorMsg(
+        validasi.ringkasanError ??
+          'Syarat presensi belum terpenuhi. Periksa status sesi dan lokasi perangkat.'
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    const hasil = await submitPresensi({
+      sesi,
+      praktikan,
+      lokasi: validasi.hasilLokasi.infoLokasiPresensi,
+      requireLokasi: true,
+    });
     setSubmitting(false);
 
     if (!hasil.ok) {
@@ -166,7 +214,9 @@ export default function HalamanPresensiPraktikan() {
         <HeaderCard
           badge="HALAMAN PRESENSI"
           title="Presensi Praktikum"
-          subtitle={`${praktikan.nama}${praktikan.nim ? ` (${praktikan.nim})` : ''} • Kelas ${praktikan.kelas ?? '-'}`}
+          subtitle={`${praktikan.nama}${
+            praktikan.nim ? ` (${praktikan.nim})` : ''
+          } • Kelas ${praktikan.kelas ?? '-'}`}
         >
           {sesiKelas.length > 0 && (
             <>
@@ -245,11 +295,11 @@ export default function HalamanPresensiPraktikan() {
           </View>
         ) : (
           <View style={[styles.columns, lebar && styles.columnsWide]}>
-            {/* Kolom Kiri: Ringkasan Sesi & Laboratorium */}
+            {/* Kolom Kiri: Ringkasan Sesi, Peta Lokasi & Geofence Laboratorium */}
             <View style={[styles.card, lebar && { flex: 1 }]}>
               <View style={styles.cardHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionBadge}>SESI TERPILIH</Text>
+                  <Text style={styles.sectionBadge}>SESI & LABORATORIUM</Text>
                   <Text style={styles.sesiTitle}>{sesi.nama}</Text>
                 </View>
                 <StatusBadge status={sesi.status} />
@@ -271,7 +321,7 @@ export default function HalamanPresensiPraktikan() {
                 label="Laboratorium"
                 value={
                   lab
-                    ? `${lab.nama} (Radius ${lab.radiusMeter}m)`
+                    ? `${lab.nama} (Radius maks. ${lab.radiusMeter}m)`
                     : sesi.ruang
                 }
               />
@@ -283,6 +333,95 @@ export default function HalamanPresensiPraktikan() {
                 </View>
               )}
 
+              {/* Peta Google Maps / Radar Geofence (FR-18) */}
+              <View style={styles.mapSection}>
+                <View style={styles.mapHeaderRow}>
+                  <Text style={styles.sectionBadge}>
+                    PETA RADIUS LABORATORIUM
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setKoordinatSimulasi(null);
+                      void segarkanLokasi();
+                    }}
+                    style={styles.refreshBtn}
+                    accessibilityRole="button"
+                  >
+                    <Ikon nama="segarkan" size={13} color={W.blue} />
+                    <Text style={styles.refreshText}>Segarkan GPS</Text>
+                  </Pressable>
+                </View>
+
+                <PetaLokasiPresensi
+                  laboratorium={lab}
+                  koordinatPerangkat={validasi.hasilLokasi.koordinat}
+                  jarakMeter={validasi.hasilLokasi.jarakMeter}
+                  dalamRadius={validasi.hasilLokasi.dalamRadius}
+                />
+
+                {/* Panel Simulasi Koordinat GPS untuk Pengujian di Emulator / Demo */}
+                {lab && (
+                  <View style={styles.simGeoBox}>
+                    <Text style={styles.simGeoTitle}>
+                      SIMULASI LOKASI GPS (UJI COBA EMULATOR)
+                    </Text>
+                    <View style={styles.simGeoRow}>
+                      <Pressable
+                        onPress={() =>
+                          setKoordinatSimulasi({
+                            latitude: lab.latitude + 0.00015,
+                            longitude: lab.longitude + 0.00015,
+                            accuracy: 12,
+                            mocked: false,
+                          })
+                        }
+                        style={[
+                          styles.simChip,
+                          isSimulasi &&
+                            validasi.hasilLokasi.dalamRadius &&
+                            styles.simChipActiveOk,
+                        ]}
+                      >
+                        <Text style={styles.simChipText}>
+                          Dalam Radius (~23m)
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          setKoordinatSimulasi({
+                            latitude: lab.latitude + 0.0032,
+                            longitude: lab.longitude + 0.0032,
+                            accuracy: 15,
+                            mocked: false,
+                          })
+                        }
+                        style={[
+                          styles.simChip,
+                          isSimulasi &&
+                            !validasi.hasilLokasi.dalamRadius &&
+                            styles.simChipActiveBad,
+                        ]}
+                      >
+                        <Text style={styles.simChipText}>
+                          Luar Radius (~490m)
+                        </Text>
+                      </Pressable>
+                      {isSimulasi && (
+                        <Pressable
+                          onPress={() => {
+                            setKoordinatSimulasi(null);
+                            void segarkanLokasi();
+                          }}
+                          style={styles.simChip}
+                        >
+                          <Text style={styles.simChipText}>GPS Asli</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                )}
+              </View>
+
               <Button
                 label="Lihat Halaman Detail Sesi"
                 variant="outline"
@@ -292,22 +431,109 @@ export default function HalamanPresensiPraktikan() {
               />
             </View>
 
-            {/* Kolom Kanan: Status Kehadiran & Eksekusi Presensi */}
+            {/* Kolom Kanan: Checklist Validasi FR-18 & Eksekusi Presensi */}
             <View style={[styles.card, lebar && { flex: 1 }]}>
-              <Text style={styles.sectionBadge}>STATUS & VERIFIKASI PRESENSI</Text>
+              <Text style={styles.sectionBadge}>
+                HASIL PEMERIKSAAN SYARAT PRESENSI
+              </Text>
 
+              {/* Checklist 3 Kondisi Wajib FR-18 */}
+              <View style={styles.checkListBox}>
+                {/* 1. Validasi Sesi */}
+                <ChecklistItem
+                  judul="1. Status Sesi Praktikum"
+                  deskripsi={validasi.pesanSesi}
+                  status={
+                    validasi.sesiValid
+                      ? 'valid'
+                      : sesi.status === 'belum_dibuka'
+                      ? 'pending'
+                      : 'invalid'
+                  }
+                />
+
+                {/* 2. Validasi Lokasi & Radius */}
+                <ChecklistItem
+                  judul="2. Validasi Lokasi & Radius Laboratorium"
+                  deskripsi={
+                    validasi.hasilLokasi.status === 'berhasil'
+                      ? `Lokasi berhasil diperoleh. ${validasi.pesanLokasi}`
+                      : validasi.pesanLokasi
+                  }
+                  status={
+                    statusLokasi === 'memuat'
+                      ? 'loading'
+                      : validasi.lokasiValid
+                      ? 'valid'
+                      : 'invalid'
+                  }
+                />
+
+                {/* 3. Validasi Kehadiran */}
+                <ChecklistItem
+                  judul="3. Status Kehadiran Praktikan"
+                  deskripsi={validasi.pesanPresensi}
+                  status={validasi.belumPresensi ? 'valid' : 'done'}
+                />
+              </View>
+
+              {/* Aksi Pemulihan Permission / GPS apabila lokasi bermasalah */}
+              {statusLokasi === 'izin_ditolak' && (
+                <View style={styles.permActionBox}>
+                  <Text style={styles.permActionText}>
+                    Akses lokasi diperlukan untuk memastikan kamu berada di dalam
+                    radius {lab?.nama ?? sesi.ruang}.
+                  </Text>
+                  <View style={styles.permBtnRow}>
+                    {canAskAgain && (
+                      <View style={{ flex: 1 }}>
+                        <Button
+                          label="Berikan Izin Lokasi"
+                          variant="primary"
+                          onPress={() => void segarkanLokasi()}
+                        />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        label="Buka Pengaturan"
+                        variant="outline"
+                        onPress={() => void bukaPengaturanIzin()}
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {(statusLokasi === 'gps_mati' ||
+                statusLokasi === 'gagal' ||
+                statusLokasi === 'akurasi_buruk') && (
+                <Button
+                  label="Coba Ambil Lokasi Lagi"
+                  variant="outline"
+                  onPress={() => void segarkanLokasi()}
+                />
+              )}
+
+              {/* Panel Status Akhir & Tombol Submit */}
               {sudahHadir ? (
                 <View style={[styles.statusPanel, styles.panelOk]}>
                   <Ikon nama="centang" size={38} color={W.green} />
                   <Text style={[styles.panelTitle, { color: W.green }]}>
-                    Kamu Sudah Melakukan Presensi
+                    Presensi Berhasil Tercatat
                   </Text>
                   <Text style={styles.panelDesc}>
-                    Kehadiranmu pada sesi {sesi.nama} telah tercatat pada pukul{' '}
+                    Pengguna sudah melakukan presensi pada pukul{' '}
                     <Text style={{ color: W.text, fontWeight: '800' }}>
                       {catatanHadir.waktuKehadiran} WIB
                     </Text>{' '}
-                    ({catatanHadir.tanggal}).
+                    ({catatanHadir.tanggal})
+                    {catatanHadir.lokasi
+                      ? ` • Jarak ${catatanHadir.lokasi.jarakMeter}m dari ${
+                          catatanHadir.lokasi.namaLab ?? sesi.ruang
+                        }`
+                      : ''}
+                    .
                   </Text>
                   <View style={{ alignSelf: 'stretch', marginTop: 8, gap: 8 }}>
                     <Button
@@ -347,34 +573,44 @@ export default function HalamanPresensiPraktikan() {
                 </View>
               ) : sesi.status === 'belum_dibuka' ? (
                 <View style={styles.statusPanel}>
-                  <Ikon nama="kunci" size={36} color={W.sub} />
+                  <Ikon nama="kunci" size={34} color={W.sub} />
                   <Text style={styles.panelTitle}>Sesi Belum Dibuka</Text>
                   <Text style={styles.panelDesc}>
-                    Asisten belum membuka sesi presensi ini. Halaman ini akan
-                    otomatis aktif secara real-time begitu asisten membuka sesi.
+                    Tunggu asisten membuka sesi praktikum. Status sesi di atas
+                    akan otomatis berubah secara real-time saat sesi dibuka.
                   </Text>
                 </View>
               ) : sesi.status === 'ditutup' ? (
                 <View style={[styles.statusPanel, styles.panelBad]}>
-                  <Ikon nama="kunci" size={36} color={W.red} />
+                  <Ikon nama="kunci" size={34} color={W.red} />
                   <Text style={[styles.panelTitle, { color: W.red }]}>
                     Sesi Sudah Ditutup
                   </Text>
                   <Text style={styles.panelDesc}>
-                    Batas waktu presensi untuk sesi ini telah berakhir dan sesi
-                    sudah ditutup oleh asisten.
+                    Presensi tidak dapat dilakukan karena sesi praktikum telah
+                    ditutup oleh asisten.
                   </Text>
+                </View>
+              ) : !validasi.lokasiValid ? (
+                <View style={[styles.statusPanel, styles.panelBad]}>
+                  <Ikon nama="peringatan" size={34} color={W.red} />
+                  <Text style={[styles.panelTitle, { color: W.red }]}>
+                    Syarat Lokasi Belum Terpenuhi
+                  </Text>
+                  <Text style={styles.panelDesc}>{validasi.pesanLokasi}</Text>
                 </View>
               ) : (
                 <>
                   <View style={[styles.statusPanel, styles.panelOk]}>
-                    <Ikon nama="play" size={32} color={W.green} />
+                    <Ikon nama="centang" size={32} color={W.green} />
                     <Text style={[styles.panelTitle, { color: W.green }]}>
-                      Sesi Sedang Dibuka
+                      Seluruh Syarat Presensi Terpenuhi
                     </Text>
                     <Text style={styles.panelDesc}>
-                      Pastikan kamu hadir di {sesi.ruang}, centang pernyataan
-                      kehadiran di bawah, lalu kirim presensi.
+                      Sesi sedang dibuka dan perangkat berada dalam radius{' '}
+                      {lab?.nama ?? sesi.ruang} (
+                      {validasi.hasilLokasi.jarakMeter}m / maks.{' '}
+                      {lab?.radiusMeter ?? 100}m).
                     </Text>
                   </View>
 
@@ -390,8 +626,8 @@ export default function HalamanPresensiPraktikan() {
                       {setuju && <Text style={styles.checkMark}>✓</Text>}
                     </View>
                     <Text style={styles.checkText}>
-                      Saya menyatakan hadir dan mengikuti praktikum {sesi.nama}{' '}
-                      di {sesi.ruang}.
+                      Saya menyatakan hadir secara fisik dan mengikuti praktikum{' '}
+                      {sesi.nama} di {sesi.ruang}.
                     </Text>
                   </Pressable>
 
@@ -403,11 +639,15 @@ export default function HalamanPresensiPraktikan() {
 
                   <Button
                     label={
-                      submitting ? 'Memproses Presensi...' : 'Kirim Presensi Sekarang'
+                      submitting
+                        ? 'Memproses Presensi...'
+                        : 'Kirim Presensi Sekarang'
                     }
                     variant="success"
                     onPress={handleKirimPresensi}
-                    disabled={!setuju || submitting || !sesiBuka || sudahHadir}
+                    disabled={
+                      !setuju || submitting || !validasi.bolehPresensi
+                    }
                   />
                 </>
               )}
@@ -424,7 +664,7 @@ export default function HalamanPresensiPraktikan() {
           ikon="centang"
           tone="success"
           title="Presensi Berhasil"
-          message="Data kehadiranmu pada sesi praktikum ini telah tersimpan."
+          message="Data kehadiran dan verifikasi lokasi laboratorium telah tersimpan."
           actions={
             <>
               <View style={styles.dRow}>
@@ -443,6 +683,15 @@ export default function HalamanPresensiPraktikan() {
                   {sesi.kelas} • {sesi.ruang}
                 </Text>
               </View>
+              {catatanHadir?.lokasi && (
+                <View style={styles.dRow}>
+                  <Text style={styles.dLabel}>Jarak Lokasi</Text>
+                  <Text style={[styles.dValue, { color: W.green }]}>
+                    {catatanHadir.lokasi.jarakMeter}m (Radius{' '}
+                    {catatanHadir.lokasi.radiusMeter}m)
+                  </Text>
+                </View>
+              )}
               <View style={styles.dRow}>
                 <Text style={styles.dLabel}>Waktu Kehadiran</Text>
                 <Text style={[styles.dValue, { color: W.green }]}>
@@ -467,6 +716,45 @@ export default function HalamanPresensiPraktikan() {
         />
       )}
     </ScrollView>
+  );
+}
+
+function ChecklistItem({
+  judul,
+  deskripsi,
+  status,
+}: {
+  judul: string;
+  deskripsi: string;
+  status: 'valid' | 'invalid' | 'pending' | 'loading' | 'done';
+}) {
+  const palette =
+    status === 'valid' || status === 'done'
+      ? { fg: W.green, bg: W.greenSoft, badge: status === 'done' ? 'TERCATAT' : 'TERPENUHI' }
+      : status === 'loading'
+      ? { fg: W.blue, bg: W.blueSoft, badge: 'MEMERIKSA' }
+      : status === 'pending'
+      ? { fg: W.amber, bg: 'rgba(245,158,11,0.16)', badge: 'MENUNGGU' }
+      : { fg: W.red, bg: W.redSoft, badge: 'DITOLAK' };
+
+  return (
+    <View style={styles.checkItem}>
+      <View style={styles.checkItemTop}>
+        <Text style={styles.checkItemTitle}>{judul}</Text>
+        <View style={[styles.checkBadge, { backgroundColor: palette.bg }]}>
+          {status === 'loading' ? (
+            <ActivityIndicator size="small" color={palette.fg} />
+          ) : (
+            <Text style={[styles.checkBadgeText, { color: palette.fg }]}>
+              {palette.badge}
+            </Text>
+          )}
+        </View>
+      </View>
+      <Text style={[styles.checkItemDesc, { color: palette.fg }]}>
+        {deskripsi}
+      </Text>
+    </View>
   );
 }
 
@@ -529,8 +817,88 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
-  noteLabel: { fontSize: 10, fontWeight: '800', color: W.sub, letterSpacing: 0.5 },
+  noteLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: W.sub,
+    letterSpacing: 0.5,
+  },
   noteText: { fontSize: 13, color: W.text, lineHeight: 19 },
+  mapSection: { gap: 10, marginTop: 4 },
+  mapHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: W.blueSoft,
+  },
+  refreshText: { fontSize: 11, fontWeight: '800', color: W.blue },
+  simGeoBox: {
+    backgroundColor: W.bg,
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: W.line,
+  },
+  simGeoTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: W.sub,
+    letterSpacing: 0.5,
+  },
+  simGeoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  simChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: W.cardAlt,
+    borderWidth: 1,
+    borderColor: W.line,
+  },
+  simChipActiveOk: { backgroundColor: W.greenSoft, borderColor: W.green },
+  simChipActiveBad: { backgroundColor: W.redSoft, borderColor: W.red },
+  simChipText: { fontSize: 11, fontWeight: '700', color: W.text },
+  checkListBox: { gap: 10 },
+  checkItem: {
+    backgroundColor: W.bg,
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: W.line,
+  },
+  checkItemTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  checkItemTitle: { fontSize: 13, fontWeight: '800', color: W.text, flex: 1 },
+  checkBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    minWidth: 68,
+    alignItems: 'center',
+  },
+  checkBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  checkItemDesc: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  permActionBox: {
+    backgroundColor: W.cardAlt,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  permActionText: { fontSize: 12, color: W.text, lineHeight: 18 },
+  permBtnRow: { flexDirection: 'row', gap: 8 },
   statusPanel: {
     backgroundColor: W.bg,
     borderRadius: 16,
@@ -543,7 +911,12 @@ const styles = StyleSheet.create({
   panelOk: { backgroundColor: W.greenSoft, borderColor: W.green },
   panelWarn: { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: W.amber },
   panelBad: { backgroundColor: W.redSoft, borderColor: W.red },
-  panelTitle: { fontSize: 16, fontWeight: '800', color: W.text, textAlign: 'center' },
+  panelTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: W.text,
+    textAlign: 'center',
+  },
   panelDesc: {
     fontSize: 13,
     color: W.sub,
