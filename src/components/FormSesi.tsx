@@ -51,7 +51,7 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
         ruang: selected.nama,
         latitude: selected.latitude,
         longitude: selected.longitude,
-        radius: selected.radius ?? 25, // konsisten dengan validasiSesi & dariDoc
+        radius: selected.radius ?? 25,
       }));
       if (err.ruang) setErr((p) => ({ ...p, ruang: undefined }));
     }
