@@ -149,8 +149,15 @@ export async function submitPresensi(params: {
   praktikan: UserDummy | undefined;
   lokasi?: InfoLokasiPresensi;
   requireAuth?: boolean;
+  requireLokasi?: boolean;
 }): Promise<HasilSubmitPresensi> {
-  const { sesi, praktikan, lokasi, requireAuth = false } = params;
+  const {
+    sesi,
+    praktikan,
+    lokasi,
+    requireAuth = false,
+    requireLokasi = false,
+  } = params;
 
   if (!sesi || !sesi.id?.trim()) {
     return { ok: false, error: 'Sesi praktikum tidak ditemukan.' };
@@ -168,6 +175,18 @@ export async function submitPresensi(params: {
         sesi.status === 'belum_dibuka'
           ? 'Presensi belum dapat dilakukan karena sesi belum dibuka oleh asisten.'
           : 'Presensi ditolak karena sesi praktikum telah ditutup.',
+    };
+  }
+  if (requireLokasi && !lokasi) {
+    return {
+      ok: false,
+      error: 'Lokasi perangkat tidak dapat diperoleh. Pastikan GPS dan izin lokasi aktif.',
+    };
+  }
+  if (lokasi && lokasi.jarakMeter > lokasi.radiusMeter) {
+    return {
+      ok: false,
+      error: `Presensi ditolak karena lokasi berada di luar radius laboratorium (${lokasi.jarakMeter}m > ${lokasi.radiusMeter}m).`,
     };
   }
 
