@@ -4,6 +4,10 @@ export interface FormSesiValues {
   nama: string;
   kelas: string;
   ruang: string;
+  laboratoriumId?: string;
+  latitude?: number;
+  longitude?: number;
+  radius?: number;
   tanggal: string; // YYYY-MM-DD
   jamMulai: string; // HH:MM
   jamSelesai: string; // HH:MM
@@ -55,6 +59,10 @@ export function keDataSesi(v: FormSesiValues): DataSesi {
     nama: v.nama.trim(),
     kelas: v.kelas.trim().toUpperCase(),
     ruang: v.ruang.trim(),
+    laboratoriumId: v.laboratoriumId,
+    latitude: v.latitude,
+    longitude: v.longitude,
+    radius: v.radius ?? 25,
     waktuMulai: gabungWaktu(v.tanggal, v.jamMulai)!.toISOString(),
     waktuSelesai: gabungWaktu(v.tanggal, v.jamSelesai)!.toISOString(),
     jumlahPeserta: Number(v.jumlahPeserta),
@@ -67,6 +75,7 @@ export function formKosong(): FormSesiValues {
     nama: '',
     kelas: '',
     ruang: '',
+    radius: 25,
     tanggal: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
     jamMulai: '',
     jamSelesai: '',
@@ -81,6 +90,10 @@ export function dariSesi(s: Sesi): FormSesiValues {
     nama: s.nama,
     kelas: s.kelas,
     ruang: s.ruang,
+    laboratoriumId: s.laboratoriumId,
+    latitude: s.latitude,
+    longitude: s.longitude,
+    radius: s.radius ?? 25,
     tanggal: `${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`,
     jamMulai: `${pad(m.getHours())}:${pad(m.getMinutes())}`,
     jamSelesai: `${pad(a.getHours())}:${pad(a.getMinutes())}`,

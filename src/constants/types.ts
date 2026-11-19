@@ -3,20 +3,27 @@ export type StatusSesi = "belum_dibuka" | "dibuka" | "ditutup";
 export interface Laboratorium {
   id: string;
   nama: string;
-  gedung?: string;
+  kode: string;
+  gedung: string;
+  lantai?: number | string;
   latitude: number;
   longitude: number;
-  /** Radius maksimal presensi dalam satuan meter */
-  radiusMeter: number;
+  radius: number; // dalam meter (default: 25)
+  deskripsi?: string;
+  createdAtIso?: string;
 }
+
+export type DataLaboratorium = Omit<Laboratorium, 'id' | 'createdAtIso'>;
 
 export interface Sesi {
   id: string;
   nama: string;
   kelas: string;
   ruang: string;
-  /** ID referensi ke entitas Laboratorium (opsional, fallback dicocokkan lewat nama ruang) */
-  labId?: string;
+  laboratoriumId?: string;
+  latitude?: number;
+  longitude?: number;
+  radius?: number;
   waktuMulai: string;
   waktuSelesai: string;
   status: StatusSesi;
@@ -96,5 +103,5 @@ export interface PengajuanIzin {
 /** Data yang diisi asisten pada form tambah/ubah sesi. */
 export type DataSesi = Pick<
   Sesi,
-  "nama" | "kelas" | "ruang" | "waktuMulai" | "waktuSelesai" | "jumlahPeserta"
+  "nama" | "kelas" | "ruang" | "waktuMulai" | "waktuSelesai" | "jumlahPeserta" | "laboratoriumId" | "latitude" | "longitude" | "radius"
 >;
