@@ -78,4 +78,5 @@ export const COLLECTIONS = {
   SESI: 'sesi',
   PRESENSI: 'presensi',
   IZIN: 'izin',
+  LABORATORIUM: 'laboratorium',
 } as const;

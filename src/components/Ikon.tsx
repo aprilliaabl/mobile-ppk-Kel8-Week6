@@ -19,6 +19,7 @@ const MAP = {
   akun: { ios: 'person.crop.circle.fill', android: 'account_circle' },
   cari: { ios: 'magnifyingglass', android: 'search' },
   tambah: { ios: 'person.badge.plus', android: 'person_add' },
+  lab: { ios: 'building.2.fill', android: 'domain' },
 } as const;
 
 export type NamaIkon = keyof typeof MAP;
