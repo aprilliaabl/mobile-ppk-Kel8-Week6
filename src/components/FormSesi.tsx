@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, useWindowDimensions, KeyboardTypeOptions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, Pressable, useWindowDimensions, KeyboardTypeOptions } from 'react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import { DataSesi, Sesi } from '../constants/types';
+import { useLaboratoriumList } from '../constants/laboratorium';
 import { ErrorSesi, FormSesiValues, dariSesi, formKosong, keDataSesi, validasiSesi } from '../constants/validasiSesi';
 import { W } from '../constants/warna';
 
@@ -17,6 +18,7 @@ interface Props {
 
 export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
   const { height } = useWindowDimensions();
+  const daftarLab = useLaboratoriumList();
   const [v, setV] = useState<FormSesiValues>(() => (sesi ? dariSesi(sesi) : formKosong()));
   const [err, setErr] = useState<ErrorSesi>({});
   const [loading, setLoading] = useState(false);
@@ -79,6 +81,26 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
           {Field({ k: 'kelas', label: 'Kelas', placeholder: 'IF-2B' })}
           {Field({ k: 'ruang', label: 'Ruang', placeholder: 'Lab Komputer 3' })}
         </View>
+        <View style={styles.labChipsWrap}>
+          <Text style={styles.labChipsLabel}>Pilih laboratorium cepat:</Text>
+          <View style={styles.labChipsRow}>
+            {daftarLab.map((lab) => {
+              const dipilih = v.ruang.trim().toLowerCase() === lab.nama.toLowerCase();
+              return (
+                <Pressable
+                  key={lab.id}
+                  onPress={() => set('ruang')(lab.nama)}
+                  style={[styles.labChip, dipilih && styles.labChipActive]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.labChipText, dipilih && styles.labChipTextActive]}>
+                    {lab.nama}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
         {Field({ k: 'tanggal', label: 'Tanggal (YYYY-MM-DD)', placeholder: '2026-11-20', keyboard: 'numbers-and-punctuation' })}
         <View style={styles.row}>
           {Field({ k: 'jamMulai', label: 'Jam mulai (HH:MM)', placeholder: '08:30', keyboard: 'numbers-and-punctuation' })}
@@ -100,4 +122,11 @@ const styles = StyleSheet.create({
   inputError: { borderColor: W.red },
   error: { fontSize: 12, color: W.red, marginTop: 4 },
   gagal: { fontSize: 13, color: W.red, fontWeight: '600' },
+  labChipsWrap: { gap: 6 },
+  labChipsLabel: { fontSize: 11, fontWeight: '700', color: W.sub },
+  labChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  labChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: W.cardAlt, borderWidth: 1, borderColor: W.line },
+  labChipActive: { backgroundColor: W.blue, borderColor: W.blue },
+  labChipText: { fontSize: 12, fontWeight: '700', color: W.sub },
+  labChipTextActive: { color: '#FFFFFF' },
 });

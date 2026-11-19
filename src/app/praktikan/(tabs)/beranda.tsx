@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { JadwalList } from '../../../features/session/components/JadwalList';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
+import { JadwalLaboratoriumSection } from '../../../components/JadwalLaboratoriumSection';
 import { useCurrentUser, useSesiPraktikan } from '../../../constants/dummy';
 import { cekSudahPresensi, useRiwayatPraktikan } from '../../../constants/presensiStore';
 import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
@@ -47,6 +48,8 @@ export default function BerandaPraktikan() {
               </View>
             </Pressable>
           )}
+
+          <JadwalLaboratoriumSection daftarSesi={sesiList} role="praktikan" />
         </View>
       }
     />
