@@ -42,9 +42,9 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
     kode: '',
     gedung: '',
     lantai: '1',
-    latitude: '-6.973000',
-    longitude: '107.630000',
-    radius: '25',
+    latitude: '-7.047909',
+    longitude: '110.440866',
+    radius: '10',
     deskripsi: '',
   });
 
@@ -60,18 +60,18 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
           lantai: String(laboratorium.lantai ?? 1),
           latitude: String(laboratorium.latitude),
           longitude: String(laboratorium.longitude),
-          radius: String(laboratorium.radius ?? 25),
+          radius: String(laboratorium.radius ?? 10),
           deskripsi: laboratorium.deskripsi ?? '',
         });
       } else {
         setForm({
           nama: '',
           kode: '',
-          gedung: 'Gedung Kuliah Bersama / Lab Informatika',
-          lantai: '1',
-          latitude: '-6.973000',
-          longitude: '107.630000',
-          radius: '25',
+          gedung: 'Gedung E FSM Undip',
+          lantai: '2',
+          latitude: '-7.047909',
+          longitude: '110.440866',
+          radius: '10',
           deskripsi: '',
         });
       }

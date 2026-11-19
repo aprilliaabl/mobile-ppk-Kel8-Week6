@@ -49,7 +49,7 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
         ruang: selected.nama,
         latitude: selected.latitude,
         longitude: selected.longitude,
-        radius: selected.radius ?? 25,
+        radius: selected.radius ?? 10,
       }));
       if (err.ruang) setErr((p) => ({ ...p, ruang: undefined }));
     }
@@ -113,7 +113,7 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
                     {lab.kode || lab.nama}
                   </Text>
                   <Text style={[styles.labPillSub, aktif && styles.labPillSubAktif]}>
-                    r: {lab.radius ?? 25}m
+                    r: {lab.radius ?? 10}m
                   </Text>
                 </Pressable>
               );
@@ -127,7 +127,7 @@ export function FormSesi({ visible, onClose, sesi, onSubmit }: Props) {
         {v.latitude !== undefined && v.longitude !== undefined && (
           <View style={styles.geoInfo}>
             <Text style={styles.geoText}>
-              📍 Koordinat: {v.latitude.toFixed(6)}, {v.longitude.toFixed(6)} • Radius: {v.radius ?? 25} meter
+              📍 Koordinat: {v.latitude.toFixed(6)}, {v.longitude.toFixed(6)} • Radius: {v.radius ?? 10} meter
             </Text>
           </View>
         )}
