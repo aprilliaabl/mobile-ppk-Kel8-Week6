@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PerubahanSesi, usePerubahanSesi } from '../constants/dummy';
@@ -13,18 +13,29 @@ const native = Platform.OS !== 'web';
 export function ToastStatusSesi({ kelas }: { kelas?: string }) {
   const insets = useSafeAreaInsets();
   const perubahan = usePerubahanSesi();
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
   const [tampil, setTampil] = useState<PerubahanSesi | null>(null);
+  const [lastKey, setLastKey] = useState<number | undefined>(undefined);
+
+  if (perubahan && perubahan.kunci !== lastKey) {
+    setLastKey(perubahan.kunci);
+    const cocokKelas =
+      !kelas || perubahan.sesi.kelas.trim().toUpperCase() === kelas.trim().toUpperCase();
+    if (cocokKelas) {
+      setTampil(perubahan);
+    }
+  }
 
   useEffect(() => {
-    if (!perubahan) return;
-    if (kelas && perubahan.sesi.kelas.trim().toUpperCase() !== kelas.trim().toUpperCase()) return;
-    setTampil(perubahan);
+    if (!tampil) return;
     Animated.timing(anim, { toValue: 1, duration: 220, useNativeDriver: native }).start();
-    const timer = setTimeout(() => sembunyikan(), 4500);
+    const timer = setTimeout(() => {
+      Animated.timing(anim, { toValue: 0, duration: 200, useNativeDriver: native }).start(({ finished }) => {
+        if (finished) setTampil(null);
+      });
+    }, 4500);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [perubahan?.kunci]);
+  }, [tampil, anim]);
 
   const sembunyikan = () => {
     Animated.timing(anim, { toValue: 0, duration: 200, useNativeDriver: native }).start(({ finished }) => {

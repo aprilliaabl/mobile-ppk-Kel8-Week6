@@ -1,4 +1,3 @@
-
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -11,7 +10,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { BottomSheet } from '../../../components/BottomSheet';
 import { Button } from '../../../components/Button';
 import { ConfirmModal } from '../../../components/ConfirmModal';
@@ -20,23 +18,10 @@ import { Ikon } from '../../../components/Ikon';
 import { InfoRow } from '../../../components/InfoRow';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { TopBar } from '../../../components/TopBar';
-import { sesiBerkaitan, useSesi, userDummy } from '../../../constants/dummy';
-
-import {
-  formatJamRentang,
-  formatTanggalPanjang,
-} from '../../../constants/format';
-
-import {
-  submitPresensi,
-  usePresensiPraktikanSesi,
-} from '../../../constants/presensiStore';
-
-import {
-  ajukanIzin,
-  useIzinSesiPraktikan,
-} from '../../../constants/izinStore';
-
+import { sesiBerkaitan, useCurrentUser, useSesi } from '../../../constants/dummy';
+import { formatJamRentang, formatTanggalPanjang } from '../../../constants/format';
+import { submitPresensi, usePresensiPraktikanSesi } from '../../../constants/presensiStore';
+import { ajukanIzin, useIzinSesiPraktikan } from '../../../constants/izinStore';
 import { MAX_W, W } from '../../../constants/warna';
 import { checkDeviceReadiness } from '../../../services/deviceReadinessService';
 
@@ -48,7 +33,7 @@ export default function DetailSesiPraktikan() {
   const lebar = width >= 820;
 
   const sesi = useSesi(id);
-  const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
+  const praktikan = useCurrentUser('praktikan');
 
   // FR-07: Cek apakah praktikan sudah pernah presensi.
   const existing = usePresensiPraktikanSesi(sesi?.id, praktikan.id);
@@ -114,17 +99,12 @@ export default function DetailSesiPraktikan() {
       const readiness = await checkDeviceReadiness();
 
       if (!readiness.ok) {
-        setErrorMsg(
-          readiness.message ??
-            'Perangkat belum siap untuk melakukan presensi.'
-        );
+        setErrorMsg(readiness.message ?? 'Perangkat belum siap untuk melakukan presensi.');
         setSubmitting(false);
         return;
       }
 
-      // FR-07: Proses presensi tetap menggunakan validasi yang ada.
       const hasil = await submitPresensi({ sesi, praktikan });
-
       setSubmitting(false);
 
       if (!hasil.ok) {
@@ -140,6 +120,11 @@ export default function DetailSesiPraktikan() {
       setErrorMsg('Terjadi kesalahan saat memeriksa perangkat. Silakan coba kembali.');
       setSubmitting(false);
     }
+  };
+
+  // Navigasi ke halaman presensi dari main.
+  const bukaHalamanPresensi = () => {
+    router.push({ pathname: '/praktikan/presensi', params: { sesiId: sesi.id } } as never);
   };
 
   // FR-11: Pengajuan izin ketidakhadiran.
@@ -421,6 +406,7 @@ export default function DetailSesiPraktikan() {
       </BottomSheet>
 
       {/* Bottom sheet pengajuan izin (FR-11) */}
+      {/* Bottom sheet + form pengajuan izin ketidakhadiran (FR-11) */}
       <BottomSheet
         visible={izinOpen}
         onClose={() => {

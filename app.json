@@ -23,7 +23,11 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.informatika.ppkkelompok8",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -31,6 +35,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Aplikasi Presensi Praktikum membutuhkan akses lokasi untuk memverifikasi kehadiran di dalam radius laboratorium."
+        }
+      ],
       [
         "expo-splash-screen",
         {

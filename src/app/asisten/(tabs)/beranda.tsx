@@ -4,11 +4,12 @@ import { JadwalList } from '../../../features/session/components/JadwalList';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
 import { Button } from '../../../components/Button';
 import { FormSesi } from '../../../components/FormSesi';
-import { tambahSesi, useSesiList, userDummy } from '../../../constants/dummy';
+import { JadwalLaboratoriumSection } from '../../../components/JadwalLaboratoriumSection';
+import { tambahSesi, useCurrentUser, useSesiList } from '../../../constants/dummy';
 import { W } from '../../../constants/warna';
 
 export default function BerandaAsisten() {
-  const asisten = userDummy.find((u) => u.role === 'asisten')!;
+  const asisten = useCurrentUser('asisten');
   const sesiList = useSesiList();
   const [formOpen, setFormOpen] = useState(false);
   const hitung = (s: string) => sesiList.filter((x) => x.status === s).length;
@@ -18,16 +19,19 @@ export default function BerandaAsisten() {
       <JadwalList
         role="asisten"
         header={
-          <HeaderCard badge="ASISTEN" title={`Halo, ${asisten.nama}`} subtitle="Kelola sesi praktikum dan pantau kehadiran praktikan">
-            <View style={styles.stats}>
-              <StatBox label="Dibuka" value={hitung('dibuka')} color={W.green} />
-              <StatBox label="Belum dibuka" value={hitung('belum_dibuka')} />
-              <StatBox label="Selesai" value={hitung('ditutup')} color={W.red} />
-            </View>
-            <View style={{ marginTop: 12 }}>
-              <Button label="+ Tambah Sesi" onPress={() => setFormOpen(true)} />
-            </View>
-          </HeaderCard>
+          <View>
+            <HeaderCard badge="ASISTEN" title={`Halo, ${asisten.nama}`} subtitle="Kelola sesi praktikum dan pantau kehadiran praktikan">
+              <View style={styles.stats}>
+                <StatBox label="Dibuka" value={hitung('dibuka')} color={W.green} />
+                <StatBox label="Belum dibuka" value={hitung('belum_dibuka')} />
+                <StatBox label="Selesai" value={hitung('ditutup')} color={W.red} />
+              </View>
+              <View style={{ marginTop: 12 }}>
+                <Button label="+ Tambah Sesi" onPress={() => setFormOpen(true)} />
+              </View>
+            </HeaderCard>
+            <JadwalLaboratoriumSection daftarSesi={sesiList} role="asisten" />
+          </View>
         }
       />
       <FormSesi visible={formOpen} onClose={() => setFormOpen(false)} onSubmit={async (data) => { await tambahSesi(data); }} />

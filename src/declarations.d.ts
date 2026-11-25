@@ -8,3 +8,8 @@ declare module '*.css' {
   export default content;
 }
 
+declare module 'firebase/auth' {
+  import { Persistence } from '@firebase/auth';
+  export * from '@firebase/auth';
+  export function getReactNativePersistence(storage: unknown): Persistence;
+}

@@ -1,15 +1,16 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { JadwalList } from '../../../features/session/components/JadwalList';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
-import { useSesiPraktikan, userDummy } from '../../../constants/dummy';
+import { JadwalLaboratoriumSection } from '../../../components/JadwalLaboratoriumSection';
+import { useCurrentUser, useSesiPraktikan } from '../../../constants/dummy';
 import { cekSudahPresensi, useRiwayatPraktikan } from '../../../constants/presensiStore';
-import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 import { W } from '../../../constants/warna';
+import { JadwalList } from '../../../features/session/components/JadwalList';
+import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 
 export default function BerandaPraktikan() {
   const router = useRouter();
-  const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
+  const praktikan = useCurrentUser('praktikan');
   const sesiList = useSesiPraktikan(praktikan); // hanya sesi untuk kelas praktikan (FR-06)
   const riwayat = useRiwayatPraktikan(praktikan.id);
   useRefreshOnFocus();
@@ -36,17 +37,19 @@ export default function BerandaPraktikan() {
 
           {perluPresensi && (
             <Pressable
-              onPress={() => router.push(`/praktikan/sesi/${perluPresensi.id}` as never)}
+              onPress={() => router.push({ pathname: '/praktikan/presensi', params: { sesiId: perluPresensi.id } } as never)}
               style={({ pressed }) => [styles.banner, pressed && { opacity: 0.85 }]}
               accessibilityRole="button"
             >
               <View style={styles.dot} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.bannerTitle}>Sesi sedang dibuka</Text>
-                <Text style={styles.bannerSub} numberOfLines={1}>{perluPresensi.nama} • ketuk untuk presensi</Text>
+                <Text style={styles.bannerSub} numberOfLines={1}>{perluPresensi.nama} • ketuk untuk buka halaman presensi</Text>
               </View>
             </Pressable>
           )}
+
+          <JadwalLaboratoriumSection daftarSesi={sesiList} role="praktikan" />
         </View>
       }
     />

@@ -1,17 +1,33 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { signOut } from 'firebase/auth';
 import { HeaderCard } from './HeaderCard';
 import { Button } from './Button';
-import { resetDemo, userDummy } from '../constants/dummy';
+import { auth } from '../config/firebase';
+import { hapusCacheSesi } from '../constants/cacheSesi';
+import { resetCurrentUserToDemo, resetDemo, useCurrentUser } from '../constants/dummy';
 import { inisial } from '../constants/format';
-import { MAX_W, W, warnaAvatar } from '../constants/warna';
+import { W, warnaAvatar } from '../constants/warna';
 
 /** Tab "Akun": identitas, ganti peran, dan reset data demo. */
 export function AkunPanel({ role }: { role: 'asisten' | 'praktikan' }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const user = userDummy.find((u) => u.role === role)!;
+  const user = useCurrentUser(role);
+
+  const handleKeluar = async () => {
+    try {
+      if (auth?.currentUser) {
+        await signOut(auth);
+      }
+    } catch {
+      // tetap lanjutkan keluar meskipun offline
+    }
+    await hapusCacheSesi();
+    resetCurrentUserToDemo();
+    router.replace('/');
+  };
 
   return (
     <ScrollView
@@ -26,15 +42,15 @@ export function AkunPanel({ role }: { role: 'asisten' | 'praktikan' }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.nama}>{user.nama}</Text>
-              <Text style={styles.sub}>{role === 'asisten' ? 'Asisten praktikum' : 'Praktikan • IF-2B'}</Text>
+              <Text style={styles.sub}>{role === 'asisten' ? 'Asisten praktikum' : `Praktikan • ${user.kelas ?? 'IF-2B'}`}</Text>
             </View>
           </View>
         </HeaderCard>
 
         <View style={styles.card}>
-          <Text style={styles.judul}>Pindah peran</Text>
-          <Text style={styles.desc}>Kembali ke halaman awal untuk masuk sebagai peran lain. Data sesi dan presensi tetap tersimpan selama aplikasi berjalan.</Text>
-          <Button label="Ganti peran / identitas" variant="outline" onPress={() => router.replace('/')} />
+          <Text style={styles.judul}>Pindah peran / keluar</Text>
+          <Text style={styles.desc}>Kembali ke halaman awal untuk masuk dengan akun lain atau berganti peran.</Text>
+          <Button label="Ganti peran / keluar akun" variant="outline" onPress={handleKeluar} />
         </View>
 
         <View style={styles.card}>

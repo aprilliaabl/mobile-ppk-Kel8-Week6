@@ -1,6 +1,7 @@
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { COLLECTIONS, db, isFirebaseConfigured } from "../config/firebase";
+import { auth, COLLECTIONS, db, isFirebaseConfigured } from "../config/firebase";
 import {
   buatIdPresensi,
   type CatatanPresensi,
@@ -35,6 +36,96 @@ export const userDummy: UserDummy[] = [
   { id: "u-2", nama: "Didi", nim: "22/001", kelas: "IF-2B", role: "praktikan" },
 ];
 
+let userVersion = 0;
+const userListeners = new Set<() => void>();
+let authSyncStarted = false;
+
+function emitUser() {
+  userVersion += 1;
+  userListeners.forEach((l) => l());
+}
+
+function mulaiSinkronisasiAuth() {
+  if (authSyncStarted || !isFirebaseConfigured || !auth || !db) return;
+  authSyncStarted = true;
+  const firestoreDb = db;
+  onAuthStateChanged(auth, async (firebaseUser) => {
+    if (!firebaseUser) return;
+    try {
+      const snap = await getDoc(doc(firestoreDb, COLLECTIONS.USERS, firebaseUser.uid));
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.accountStatus !== "active") return;
+      if (data.role === "asisten") {
+        setCurrentUser({
+          id: firebaseUser.uid,
+          nama: String(data.nama || firebaseUser.email || "Asisten"),
+          role: "asisten",
+        });
+      } else if (data.role === "praktikan") {
+        setCurrentUser({
+          id: firebaseUser.uid,
+          nama: String(data.nama || firebaseUser.email || "Praktikan"),
+          nim: String(data.nim || "22/001"),
+          kelas: String(data.kelas || "IF-2B"),
+          role: "praktikan",
+        });
+      }
+    } catch {
+      // Tetap gunakan state user yang sedang aktif jika pembacaan profil gagal saat offline
+    }
+  });
+}
+
+export function subscribeUser(listener: () => void): () => void {
+  userListeners.add(listener);
+  mulaiSinkronisasiAuth();
+  return () => {
+    userListeners.delete(listener);
+  };
+}
+
+export function setCurrentUser(user: Partial<UserDummy> & { role: Role }) {
+  const target = userDummy.find((u) => u.role === user.role);
+  if (target) {
+    if (user.id) target.id = user.id;
+    if (user.nama) target.nama = user.nama;
+    if (user.nim !== undefined) target.nim = user.nim;
+    if (user.kelas !== undefined) target.kelas = user.kelas;
+    emitUser();
+  }
+}
+
+export function resetCurrentUserToDemo() {
+  const asisten = userDummy.find((u) => u.role === "asisten");
+  if (asisten) {
+    asisten.id = "u-1";
+    asisten.nama = "Dada";
+  }
+  const praktikan = userDummy.find((u) => u.role === "praktikan");
+  if (praktikan) {
+    praktikan.id = "u-2";
+    praktikan.nama = "Didi";
+    praktikan.nim = "22/001";
+    praktikan.kelas = "IF-2B";
+  }
+  emitUser();
+}
+
+/** Hook reaktif untuk mendapatkan profil pengguna sesuai role (tersinkronisasi dengan Firebase Auth & Mode Demo). */
+export function useCurrentUser(role: Role): UserDummy {
+  const v = useSyncExternalStore(
+    subscribeUser,
+    () => userVersion,
+    () => userVersion
+  );
+  return useMemo(() => {
+    void v;
+    const found = userDummy.find((u) => u.role === role)!;
+    return { ...found };
+  }, [role, v]);
+}
+
 /** Waktu dibuat relatif terhadap hari ini supaya label "Hari ini / Besok" selalu relevan. */
 function at(dayOffset: number, jam: number, menit: number): string {
   const d = new Date();
@@ -50,6 +141,7 @@ function buatSesiAwal(): Sesi[] {
       nama: "Praktikum Struktur Data",
       kelas: "IF-2B",
       ruang: "Lab Komputer 1",
+      labId: "lab-komputer-1",
       waktuMulai: at(0, 8, 0),
       waktuSelesai: at(0, 10, 0),
       status: "belum_dibuka",
@@ -60,6 +152,7 @@ function buatSesiAwal(): Sesi[] {
       nama: "Praktikum Basis Data",
       kelas: "IF-2B",
       ruang: "Lab Komputer 3",
+      labId: "lab-komputer-3",
       waktuMulai: at(0, 10, 30),
       waktuSelesai: at(0, 12, 30),
       status: "dibuka",
@@ -72,6 +165,7 @@ function buatSesiAwal(): Sesi[] {
       nama: "Praktikum Pemrograman Web",
       kelas: "IF-3A",
       ruang: "Lab Komputer 2",
+      labId: "lab-komputer-2",
       waktuMulai: at(-1, 8, 0),
       waktuSelesai: at(-1, 10, 0),
       status: "ditutup",
@@ -84,6 +178,7 @@ function buatSesiAwal(): Sesi[] {
       nama: "Praktikum Jaringan Komputer",
       kelas: "IF-3B",
       ruang: "Lab Jaringan",
+      labId: "lab-jaringan",
       waktuMulai: at(1, 13, 0),
       waktuSelesai: at(1, 15, 0),
       status: "belum_dibuka",

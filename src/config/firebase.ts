@@ -8,6 +8,8 @@ import {
 
 import {
   getAuth,
+  initializeAuth,
+  getReactNativePersistence,
   type Auth,
 } from 'firebase/auth';
 
@@ -15,6 +17,9 @@ import {
   getFirestore,
   type Firestore,
 } from 'firebase/firestore';
+
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Konfigurasi Firebase dari environment variable
 const firebaseConfig = {
@@ -55,13 +60,16 @@ if (isFirebaseConfigured) {
       : initializeApp(firebaseConfig);
 
     // Firebase Authentication
-    authInstance = getAuth(appInstance);
+    authInstance = Platform.OS === 'web'
+      ? getAuth(appInstance)
+      : initializeAuth(appInstance, {
+          persistence: getReactNativePersistence(AsyncStorage),
+        });
 
     // Firebase Firestore
     dbInstance = getFirestore(appInstance);
 
     console.log('[Firebase] Berhasil diinisialisasi.');
-
   } catch (error) {
     console.error(
       '[Firebase] Gagal melakukan inisialisasi:',
@@ -85,4 +93,5 @@ export const COLLECTIONS = {
   SESI: 'sesi',
   PRESENSI: 'presensi',
   IZIN: 'izin',
+  LABORATORIUM: 'laboratorium',
 } as const;

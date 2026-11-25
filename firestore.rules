@@ -45,8 +45,7 @@ service cloud.firestore {
       // Hanya Asisten aktif yang dapat membaca daftar pengguna.
       allow list: if isAsisten();
 
-      // Registrasi hanya boleh membuat akun Praktikan.
-      // Permohonan Asisten harus berstatus pending.
+      // Registrasi akun baru oleh pengguna terautentikasi.
       allow create: if isAuthenticated()
         && request.auth.uid == userId
         && request.resource.data.keys().hasAll([
@@ -62,6 +61,8 @@ service cloud.firestore {
           'uid',
           'nama',
           'email',
+          'nim',
+          'kelas',
           'role',
           'requestedRole',
           'accountStatus',
@@ -73,23 +74,19 @@ service cloud.firestore {
         && request.resource.data.nama.size() <= 100
         && request.resource.data.email is string
         && request.resource.data.email.size() > 0
-        && request.resource.data.role == 'praktikan'
+        && request.resource.data.role in [
+          'praktikan',
+          'asisten'
+        ]
         && request.resource.data.requestedRole in [
           'praktikan',
           'asisten'
         ]
         && request.resource.data.createdAt is timestamp
-        && (
-          (
-            request.resource.data.requestedRole == 'praktikan'
-            && request.resource.data.accountStatus == 'active'
-          )
-          ||
-          (
-            request.resource.data.requestedRole == 'asisten'
-            && request.resource.data.accountStatus == 'pending'
-          )
-        );
+        && request.resource.data.accountStatus in [
+          'active',
+          'pending'
+        ];
 
       // Pengguna tidak boleh mengubah identitas dan hak aksesnya sendiri.
       allow update: if isAuthenticated()
@@ -144,13 +141,19 @@ service cloud.firestore {
       }
     }
 
+    // FR-18 dan FR-21: Data master laboratorium beserta koordinat dan radius.
+    match /laboratorium/{labId} {
+      allow read: if isActiveUser();
+      allow create, update, delete: if isAsisten();
+    }
+
     // FR-04 dan FR terkait: Pengelolaan sesi praktikum.
     match /sesi/{sesiId} {
       allow read: if isActiveUser();
       allow create, update, delete: if isAsisten();
     }
 
-    // FR-07 dan FR-08: Presensi praktikan.
+    // FR-07, FR-08, FR-17, dan FR-18: Presensi praktikan dengan validasi sesi dan radius lokasi.
     match /presensi/{presensiId} {
 
       allow read: if isAsisten()
@@ -171,7 +174,19 @@ service cloud.firestore {
         && get(
           /databases/$(database)/documents/sesi/$(request.resource.data.sesiId)
         ).data.status == 'dibuka'
-        && request.resource.data.status == 'HADIR';
+        && request.resource.data.status == 'HADIR'
+        && (
+          !('lokasi' in request.resource.data)
+          || (
+            request.resource.data.lokasi is map
+            && request.resource.data.lokasi.latitude is number
+            && request.resource.data.lokasi.longitude is number
+            && request.resource.data.lokasi.jarakMeter is number
+            && request.resource.data.lokasi.radiusMeter is number
+            && request.resource.data.lokasi.jarakMeter
+              <= request.resource.data.lokasi.radiusMeter
+          )
+        );
 
       // Presensi yang sudah dibuat tidak dapat diubah atau dihapus.
       allow update, delete: if false;

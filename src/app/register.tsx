@@ -114,13 +114,13 @@ export default function Register() {
         await signOut(auth);
 
         Alert.alert(
-          'Permohonan Terkirim',
-          'Akun berhasil dibuat. Permohonan sebagai Asisten menunggu persetujuan administrator.'
+          'Registrasi Berhasil',
+          `Akun Asisten untuk ${namaBersih} berhasil didaftarkan! Silakan login untuk mengelola sesi.`
         );
       } else {
         Alert.alert(
           'Registrasi Berhasil',
-          `Selamat datang, ${namaBersih}! Akun Praktikan kamu berhasil dibuat.`
+          `Selamat datang, ${namaBersih}! Akun Praktikan kamu berhasil dibuat. Silakan login.`
         );
       }
 

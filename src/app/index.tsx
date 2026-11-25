@@ -24,7 +24,23 @@ export default function PilihRole() {
       <View style={styles.inner}>
         <View style={styles.logo}><Ikon nama="centang" size={36} color="#FFFFFF" /></View>
         <Text style={styles.title}>Presensi Praktikum</Text>
-        <Text style={styles.subtitle}>Pilih peran untuk memulai demo alur praktikum</Text>
+        <Text style={styles.subtitle}>Sistem Presensi & Pengelolaan Sesi Praktikum</Text>
+
+        {/* Tombol Utama Akun Firebase */}
+        <View style={styles.authBanner}>
+          <Text style={styles.authTitle}>Punya Akun Praktikum?</Text>
+          <Text style={styles.authSubtitle}>Masuk atau daftar dengan akun Firebase untuk presensi real-time</Text>
+          <View style={{ gap: 10, marginTop: 6 }}>
+            <Button label="Masuk dengan Akun Firebase" onPress={() => router.push('/login' as never)} />
+            <Button label="Belum punya akun? Daftar Akun Baru" variant="outline" onPress={() => router.push('/register' as never)} />
+          </View>
+        </View>
+
+        <View style={{ marginVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: W.line }} />
+          <Text style={{ color: W.sub, fontSize: 12, fontWeight: '700' }}>ATAU GUNAKAN MODE DEMO CEPAT</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: W.line }} />
+        </View>
 
         <View style={[styles.cards, lebar && styles.cardsRow]}>
           {/* Kartu Asisten */}
@@ -73,6 +89,9 @@ const styles = StyleSheet.create({
   logo: { width: 76, height: 76, borderRadius: 24, backgroundColor: W.blue, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 14 },
   title: { fontSize: 28, fontWeight: '800', color: W.text, textAlign: 'center' },
   subtitle: { fontSize: 14, color: W.sub, textAlign: 'center', marginBottom: 26 },
+  authBanner: { backgroundColor: W.card, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: W.blue, gap: 6, marginBottom: 8 },
+  authTitle: { fontSize: 16, fontWeight: '800', color: W.text },
+  authSubtitle: { fontSize: 13, color: W.sub, lineHeight: 18, marginBottom: 4 },
   cards: { gap: 14, marginBottom: 8 },
   cardsRow: { flexDirection: 'row', alignItems: 'flex-start' },
   kartu: { backgroundColor: W.card, borderRadius: 24, padding: 20, gap: 14, borderWidth: 1, borderColor: W.line },
