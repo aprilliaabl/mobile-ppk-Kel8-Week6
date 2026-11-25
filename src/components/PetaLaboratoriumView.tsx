@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -9,24 +9,11 @@ import {
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { WebView } from 'react-native-webview';
 import { useLaboratoriumList } from '../constants/laboratoriumStore';
 import { useSesiList } from '../constants/dummy';
-import type { Laboratorium, Sesi } from '../constants/types';
+import type { Laboratorium } from '../constants/types';
 import { W } from '../constants/warna';
-
-// Import react-native-maps secara aman hanya untuk mobile native
-let MapView: any = null;
-let Marker: any = null;
-let Circle: any = null;
-let Callout: any = null;
-
-if (Platform.OS !== 'web') {
-  const Maps = require('react-native-maps');
-  MapView = Maps.default;
-  Marker = Maps.Marker;
-  Circle = Maps.Circle;
-  Callout = Maps.Callout;
-}
 
 export function PetaLaboratoriumView() {
   const labList = useLaboratoriumList();
@@ -35,32 +22,20 @@ export function PetaLaboratoriumView() {
   const [lokasiUser, setLokasiUser] = useState<Location.LocationObjectCoords | null>(null);
   const [izinLokasi, setIzinLokasi] = useState<'granted' | 'denied' | 'pending'>('pending');
   const [selectedLab, setSelectedLab] = useState<Laboratorium | null>(null);
-  const [loadingLokasi, setLoadingLokasi] = useState(true);
 
-  const mapRef = useRef<any>(null);
-
-  // Koordinat Tengah Informatika FSM Undip
+  // Koordinat Pusat (Default FSM Undip Gedung E & A)
   const centerLat = selectedLab ? selectedLab.latitude : -7.047909;
   const centerLng = selectedLab ? selectedLab.longitude : 110.440866;
-
-  const initialRegion = {
-    latitude: -7.048000,
-    longitude: 110.441000,
-    latitudeDelta: 0.0025,
-    longitudeDelta: 0.0025,
-  };
 
   useEffect(() => {
     let subscriber: Location.LocationSubscription | null = null;
 
     async function inisialisasiLokasi() {
       try {
-        setLoadingLokasi(true);
         const { status } = await Location.requestForegroundPermissionsAsync();
 
         if (status !== 'granted') {
           setIzinLokasi('denied');
-          setLoadingLokasi(false);
           return;
         }
 
@@ -70,9 +45,8 @@ export function PetaLaboratoriumView() {
           accuracy: Location.Accuracy.Balanced,
         });
         setLokasiUser(lokasiAwal.coords);
-        setLoadingLokasi(false);
 
-        // Pantau realtime (FR-20)
+        // Pantau pergerakan lokasi pengguna secara realtime (FR-20)
         subscriber = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
@@ -86,7 +60,6 @@ export function PetaLaboratoriumView() {
       } catch (err) {
         console.warn('[PetaLab] Gagal membaca lokasi:', err);
         setIzinLokasi('denied');
-        setLoadingLokasi(false);
       }
     }
 
@@ -98,22 +71,6 @@ export function PetaLaboratoriumView() {
       }
     };
   }, []);
-
-  const fokusKeUser = () => {
-    if (lokasiUser && mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          latitude: lokasiUser.latitude,
-          longitude: lokasiUser.longitude,
-          latitudeDelta: 0.0015,
-          longitudeDelta: 0.0015,
-        },
-        800
-      );
-    } else {
-      Alert.alert('Lokasi Belum Tersedia', 'Pastikan izin lokasi diberikan dan GPS aktif.');
-    }
-  };
 
   // Aktivitas Sesi di Lab Terpilih (Sedang Berlangsung & Berikutnya)
   const getAktivitasLab = (lab: Laboratorium) => {
@@ -130,33 +87,35 @@ export function PetaLaboratoriumView() {
     return { sedangBerlangsung, berikutnya, total: sesiDiLab.length };
   };
 
-  // Generate HTML Leaflet Interaktif Khusus Web dengan Visualisasi Lingkaran Radius 10 Meter
-  const renderWebLeafletMap = () => {
+  // Template HTML Leaflet Interaktif (Kompatibel 100% Android WebView & Browser Web)
+  const renderLeafletHTML = () => {
     const labsJson = JSON.stringify(labList);
     const userLat = lokasiUser ? lokasiUser.latitude : null;
     const userLng = lokasiUser ? lokasiUser.longitude : null;
     const activeLabId = selectedLab ? selectedLab.id : null;
 
-    const htmlContent = `
+    return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <style>
           body, html { margin:0; padding:0; height:100%; width:100%; background:#0F172A; }
           #map { height:100%; width:100%; }
-          .custom-popup { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; }
-          .custom-popup b { color: #0284C7; font-size: 13px; }
-          .radius-tag { display: inline-block; background: #DCFCE7; color: #15803D; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-top: 4px; font-size: 10px; }
+          .custom-popup { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; line-height: 1.4; }
+          .custom-popup b { color: #0284C7; font-size: 14px; }
+          .radius-tag { display: inline-block; background: #DCFCE7; color: #15803D; padding: 2px 7px; border-radius: 4px; font-weight: 700; margin-top: 5px; font-size: 11px; }
         </style>
       </head>
       <body>
         <div id="map"></div>
         <script>
-          const map = L.map('map').setView([${centerLat}, ${centerLng}], 19);
+          const map = L.map('map', { zoomControl: false }).setView([${centerLat}, ${centerLng}], 19);
+          L.control.zoom({ position: 'topright' }).addTo(map);
+
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 21,
             attribution: '© OpenStreetMap'
@@ -169,7 +128,7 @@ export function PetaLaboratoriumView() {
             const rad = lab.radius || 10;
             const isSelected = activeLabId === lab.id;
 
-            // 1. Marking Area Radius 10 Meter (Lingkaran)
+            // 1. Marking Area Radius 10 Meter (Geofence Circle)
             L.circle([lab.latitude, lab.longitude], {
               radius: rad,
               color: isSelected ? '#EF4444' : '#208AEF',
@@ -193,158 +152,108 @@ export function PetaLaboratoriumView() {
             }
           });
 
-          // Marker & Posisi User Saat Ini
+          // Marker Live Posisi Pengguna
           const userLat = ${userLat ?? 'null'};
           const userLng = ${userLng ?? 'null'};
           if (userLat && userLng) {
             L.circleMarker([userLat, userLng], {
-              radius: 7,
+              radius: 8,
               color: '#FFFFFF',
               fillColor: '#10B981',
               fillOpacity: 1,
-              weight: 2
+              weight: 3
             }).addTo(map).bindPopup('<b>📍 Posisi Kamu Saat Ini</b>');
           }
         </script>
       </body>
       </html>
     `;
-
-    return (
-      <iframe
-        title="Leaflet Map FSM Undip"
-        srcDoc={htmlContent}
-        style={{
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          borderRadius: 16,
-        }}
-      />
-    );
   };
 
   return (
     <View style={styles.container}>
-      {Platform.OS === 'web' ? (
-        // ================= TAMPILAN PETA VISUAL WEB =================
-        <View style={styles.webContainer}>
-          {/* Header Info Web */}
-          <View style={styles.webHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.webTitle}>🗺️ Peta Interaktif Laboratorium</Text>
-              <Text style={styles.webSubtitle}>
-                Gedung E & A FSM Undip • Marking Area Presensi Radius 10 Meter
-              </Text>
-            </View>
-            <View style={styles.webGpsBadge}>
-              <Text style={styles.webGpsText}>
-                {izinLokasi === 'granted' ? '📍 GPS Aktif' : '⚠️ Perlu Izin GPS'}
-              </Text>
-            </View>
+      {/* Header Info Atas */}
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>🗺️ Peta Interaktif Laboratorium</Text>
+          <Text style={styles.subtitle}>
+            FSM Undip • Radius Presensi 10 Meter
+          </Text>
+        </View>
+        <View style={styles.gpsBadge}>
+          <Text style={styles.gpsText}>
+            {izinLokasi === 'granted' ? '📍 GPS Aktif' : '⚠️ Cek Izin GPS'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Frame Tampilan Peta Interaktif (Bebas Google Maps API Key) */}
+      <View style={styles.mapContainer}>
+        {Platform.OS === 'web' ? (
+          // @ts-ignore - iframe untuk browser Web
+          <iframe
+            title="Peta Laboratorium"
+            srcDoc={renderLeafletHTML()}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              borderRadius: 16,
+            }}
+          />
+        ) : (
+          // WebView untuk Android & iOS Native APK
+          <WebView
+            originWhitelist={['*']}
+            source={{ html: renderLeafletHTML() }}
+            style={{ flex: 1, borderRadius: 16, backgroundColor: '#0F172A' }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+          />
+        )}
+
+        {selectedLab && (
+          <View style={styles.floatingTarget}>
+            <Text style={styles.floatingTitle}>🎯 Target: {selectedLab.nama}</Text>
+            <Text style={styles.floatingSub}>
+              {selectedLab.latitude.toFixed(6)}, {selectedLab.longitude.toFixed(6)} • Radius {selectedLab.radius ?? 10}m
+            </Text>
           </View>
+        )}
+      </View>
 
-          {/* Wrapper Peta Leaflet dengan Lingkaran Radius 10 Meter */}
-          <View style={styles.mapFrameWrapper}>
-            {renderWebLeafletMap()}
-
-            {selectedLab && (
-              <View style={styles.mapFloatingInfo}>
-                <Text style={styles.mapFloatingTitle}>🎯 Target: {selectedLab.nama}</Text>
-                <Text style={styles.mapFloatingSub}>
-                  {selectedLab.latitude.toFixed(6)}, {selectedLab.longitude.toFixed(6)} • Radius {selectedLab.radius ?? 10}m
+      {/* Daftar Kartu Pilihan Lab di Bawah Peta */}
+      <Text style={styles.sectionTitle}>Pilih Marker Laboratorium:</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.labListScroll}
+      >
+        {labList.map((lab) => {
+          const aktif = selectedLab?.id === lab.id;
+          return (
+            <Pressable
+              key={lab.id}
+              style={[styles.labCard, aktif && styles.labCardAktif]}
+              onPress={() => setSelectedLab(lab)}
+            >
+              <View style={styles.cardHeaderRow}>
+                <Text style={[styles.labNama, aktif && styles.labNamaAktif]}>
+                  {lab.nama}
                 </Text>
+                <View style={styles.badgeRadiusSmall}>
+                  <Text style={styles.badgeRadiusTextSmall}>{lab.radius ?? 10}m</Text>
+                </View>
               </View>
-            )}
-          </View>
+              <Text style={styles.labKode}>{lab.kode} • Lantai {lab.lantai ?? 1}</Text>
+              <Text style={styles.labGedung}>{lab.gedung}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
-          {/* Daftar Kartu Pilihan Lab di Bawah Peta */}
-          <Text style={styles.sectionTitle}>Pilih Marker Laboratorium:</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.webLabList}
-          >
-            {labList.map((lab) => {
-              const aktif = selectedLab?.id === lab.id;
-              return (
-                <Pressable
-                  key={lab.id}
-                  style={[styles.webLabCard, aktif && styles.webLabCardAktif]}
-                  onPress={() => setSelectedLab(lab)}
-                >
-                  <View style={styles.cardHeaderRow}>
-                    <Text style={[styles.webLabNama, aktif && styles.webLabNamaAktif]}>
-                      {lab.nama}
-                    </Text>
-                    <View style={styles.badgeRadiusSmall}>
-                      <Text style={styles.badgeRadiusTextSmall}>{lab.radius ?? 10}m</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.webLabKode}>{lab.kode} • Lantai {lab.lantai ?? 1}</Text>
-                  <Text style={styles.webLabGedung}>{lab.gedung}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : (
-        // ================= TAMPILAN MOBILE NATIVE GOOGLE MAPS =================
-        <View style={StyleSheet.absoluteFill}>
-          <MapView
-            ref={mapRef}
-            style={StyleSheet.absoluteFill}
-            initialRegion={initialRegion}
-            showsCompass={true}
-            showsBuildings={true}
-          >
-            {/* Visualisasi Marking Area Radius 10 Meter */}
-            {labList.map((lab) => (
-              <Circle
-                key={`circle-${lab.id}`}
-                center={{ latitude: lab.latitude, longitude: lab.longitude }}
-                radius={lab.radius ?? 10}
-                fillColor="rgba(32, 138, 239, 0.25)"
-                strokeColor="#208AEF"
-                strokeWidth={2}
-              />
-            ))}
-
-            {/* Marker Laboratorium Informatika */}
-            {labList.map((lab) => (
-              <Marker
-                key={`marker-${lab.id}`}
-                coordinate={{ latitude: lab.latitude, longitude: lab.longitude }}
-                title={lab.nama}
-                description={`${lab.gedung} (Radius: ${lab.radius ?? 10}m)`}
-                onPress={() => setSelectedLab(lab)}
-                pinColor="#208AEF"
-              />
-            ))}
-
-            {/* Live Real-time Marker Lokasi User */}
-            {lokasiUser && (
-              <Marker
-                coordinate={{
-                  latitude: lokasiUser.latitude,
-                  longitude: lokasiUser.longitude,
-                }}
-                title="Posisi Kamu"
-                description="Lokasi perangkat saat ini"
-                pinColor="#10B981"
-              />
-            )}
-          </MapView>
-
-          {/* Tombol Melayang Fokus ke User */}
-          <Pressable style={styles.myLocationBtn} onPress={fokusKeUser}>
-            <Text style={styles.myLocationIcon}>📍</Text>
-            <Text style={styles.myLocationText}>Lokasi Saya</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* Modal / Bottom Sheet Detail Laboratorium Terpilih */}
+      {/* Bottom Card Detail Laboratorium Terpilih & Aktivitas Sesi */}
       {selectedLab && (
         <View style={styles.bottomCard}>
           <View style={styles.bottomCardHead}>
@@ -413,28 +322,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: W.bg,
-  },
-  webContainer: {
     padding: 16,
-    flex: 1,
     gap: 12,
   },
-  webHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: Platform.OS === 'android' ? 24 : 0,
   },
-  webTitle: {
+  title: {
     fontSize: 20,
     fontWeight: '800',
     color: W.text,
   },
-  webSubtitle: {
+  subtitle: {
     fontSize: 12,
     color: W.sub,
     marginTop: 2,
   },
-  webGpsBadge: {
+  gpsBadge: {
     backgroundColor: W.cardAlt,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -442,14 +349,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: W.line,
   },
-  webGpsText: {
+  gpsText: {
     color: W.green,
     fontSize: 12,
     fontWeight: '700',
   },
-  mapFrameWrapper: {
+  mapContainer: {
     flex: 1,
-    minHeight: 340,
+    minHeight: 280,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1.5,
@@ -457,25 +364,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     position: 'relative',
   },
-  mapFloatingInfo: {
+  floatingTarget: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    top: 10,
+    left: 10,
     backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: W.blue,
   },
-  mapFloatingTitle: {
+  floatingTitle: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
-  mapFloatingSub: {
+  floatingSub: {
     color: W.sub,
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 2,
   },
   sectionTitle: {
@@ -483,11 +390,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: W.text,
   },
-  webLabList: {
+  labListScroll: {
     gap: 10,
     paddingBottom: 4,
   },
-  webLabCard: {
+  labCard: {
     backgroundColor: W.card,
     padding: 12,
     borderRadius: 14,
@@ -496,7 +403,7 @@ const styles = StyleSheet.create({
     width: 220,
     gap: 4,
   },
-  webLabCardAktif: {
+  labCardAktif: {
     borderColor: W.blue,
     backgroundColor: W.blueSoft,
   },
@@ -505,13 +412,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  webLabNama: {
+  labNama: {
     fontSize: 14,
     fontWeight: '800',
     color: W.text,
     flex: 1,
   },
-  webLabNamaAktif: {
+  labNamaAktif: {
     color: W.blue,
   },
   badgeRadiusSmall: {
@@ -525,41 +432,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
-  webLabKode: {
+  labKode: {
     fontSize: 12,
     color: W.blue,
     fontWeight: '700',
   },
-  webLabGedung: {
+  labGedung: {
     fontSize: 11,
     color: W.sub,
-  },
-  myLocationBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: W.card,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: W.line,
-  },
-  myLocationIcon: {
-    fontSize: 16,
-  },
-  myLocationText: {
-    color: W.text,
-    fontSize: 13,
-    fontWeight: '700',
   },
   bottomCard: {
     position: 'absolute',
