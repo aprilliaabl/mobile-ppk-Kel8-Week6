@@ -47,9 +47,7 @@ if (isFirebaseConfigured) {
       authInstance = Platform.OS === 'web'
         ? getAuth(appInstance)
         : initializeAuth(appInstance, {
-            persistence: typeof getReactNativePersistence === 'function'
-              ? getReactNativePersistence(AsyncStorage)
-              : undefined,
+            persistence: getReactNativePersistence(AsyncStorage),
           });
     } catch (error) {
       const firebaseError = error as { code?: string };

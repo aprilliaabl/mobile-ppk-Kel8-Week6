@@ -321,7 +321,7 @@ export default function HalamanPresensiPraktikan() {
                 label="Laboratorium"
                 value={
                   lab
-                    ? `${lab.nama} (Radius maks. ${lab.radiusMeter}m)`
+                    ? `${lab.nama} (Radius maks. ${lab.radius}m)`
                     : sesi.ruang
                 }
               />
@@ -610,7 +610,7 @@ export default function HalamanPresensiPraktikan() {
                       Sesi sedang dibuka dan perangkat berada dalam radius{' '}
                       {lab?.nama ?? sesi.ruang} (
                       {validasi.hasilLokasi.jarakMeter}m / maks.{' '}
-                      {lab?.radiusMeter ?? 100}m).
+                      {lab?.radius ?? 100}m).
                     </Text>
                   </View>
 

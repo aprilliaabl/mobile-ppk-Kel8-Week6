@@ -94,7 +94,7 @@ export function PetaLokasiPresensi({
               latitude: laboratorium.latitude,
               longitude: laboratorium.longitude,
             }}
-            radius={laboratorium.radiusMeter}
+            radius={laboratorium.radius}
             strokeWidth={2}
             strokeColor={warnaRadius}
             fillColor={warnaIsiRadius}
@@ -107,7 +107,7 @@ export function PetaLokasiPresensi({
               longitude: laboratorium.longitude,
             }}
             title={laboratorium.nama}
-            description={`Radius presensi: ${laboratorium.radiusMeter}m`}
+            description={`Radius presensi: ${laboratorium.radius}m`}
             pinColor={W.blue}
           />
 

@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -105,6 +104,41 @@ service cloud.firestore {
 
       // Profil tidak boleh dihapus melalui aplikasi.
       allow delete: if false;
+
+      // FR-22: Pengelolaan token FCM milik pengguna.
+      match /fcmTokens/{tokenId} {
+
+        // Pengguna hanya dapat mendaftarkan atau memperbarui
+        // token milik akunnya sendiri.
+        allow create, update: if isActiveUser()
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasAll([
+            'token',
+            'platform',
+            'updatedAt'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'token',
+            'platform',
+            'updatedAt'
+          ])
+          && request.resource.data.token == tokenId
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 0
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.platform in [
+            'android',
+            'ios'
+          ]
+          && request.resource.data.updatedAt is timestamp;
+
+        // Pengguna hanya dapat menghapus token milik akunnya sendiri.
+        allow delete: if isActiveUser()
+          && request.auth.uid == userId;
+
+        // Token tidak perlu dapat dibaca oleh pengguna lain.
+        allow read: if false;
+      }
     }
 
     // FR-18 dan FR-21: Data master laboratorium beserta koordinat dan radius.

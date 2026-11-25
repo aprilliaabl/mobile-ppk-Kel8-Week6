@@ -1,4 +1,5 @@
 
+import { Link } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,9 +25,9 @@ import {
 
 import {
   auth,
+  COLLECTIONS,
   db,
   isFirebaseConfigured,
-  COLLECTIONS,
 } from '../config/firebase';
 
 type Role = 'praktikan' | 'asisten';
@@ -42,6 +43,7 @@ export default function Register() {
     const namaBersih = nama.trim();
     const emailBersih = email.trim().toLowerCase();
 
+    // Validasi input
     if (!namaBersih || !emailBersih || !password || !role) {
       Alert.alert('Peringatan', 'Semua kolom wajib diisi.');
       return;
@@ -60,6 +62,7 @@ export default function Register() {
       return;
     }
 
+    // Validasi konfigurasi Firebase
     if (!isFirebaseConfigured || !auth || !db) {
       Alert.alert(
         'Konfigurasi Firebase',
@@ -73,6 +76,7 @@ export default function Register() {
     try {
       setLoading(true);
 
+      // Membuat akun menggunakan Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         emailBersih,
@@ -82,8 +86,8 @@ export default function Register() {
       createdUser = userCredential.user;
 
       const isAsistenRequest = role === 'asisten';
-      const userRole = isAsistenRequest ? 'asisten' : 'praktikan';
 
+      // Menyimpan profil pengguna ke Firestore
       await setDoc(
         doc(db, COLLECTIONS.USERS, createdUser.uid),
         {
@@ -91,20 +95,24 @@ export default function Register() {
           nama: namaBersih,
           email: emailBersih,
 
-          // Role akun
-          role: userRole,
+          // Hak akses awal selalu praktikan
+          role: 'praktikan',
 
-          // Peran yang dipilih saat registrasi.
+          // Role yang dipilih saat registrasi
           requestedRole: role,
 
-          // Status akun: langsung aktif agar bisa login & digunakan saat demo praktikum
-          accountStatus: 'active',
+          // Permohonan asisten membutuhkan persetujuan
+          accountStatus: isAsistenRequest ? 'pending' : 'active',
 
           createdAt: serverTimestamp(),
         }
       );
 
+      // Penanganan berdasarkan role yang dipilih
       if (isAsistenRequest) {
+        // Akun asisten menunggu persetujuan administrator
+        await signOut(auth);
+
         Alert.alert(
           'Registrasi Berhasil',
           `Akun Asisten untuk ${namaBersih} berhasil didaftarkan! Silakan login untuk mengelola sesi.`
@@ -116,6 +124,7 @@ export default function Register() {
         );
       }
 
+      // Mengosongkan form setelah berhasil
       setNama('');
       setEmail('');
       setPassword('');
@@ -124,8 +133,7 @@ export default function Register() {
     } catch (error: unknown) {
       console.error('Registration error:', error);
 
-      // Jika profil gagal disimpan, hapus akun Auth yang baru dibuat
-      // agar tidak meninggalkan akun tanpa dokumen profil.
+      // Menghapus akun Auth jika penyimpanan profil gagal
       if (createdUser) {
         try {
           await deleteUser(createdUser);
@@ -143,8 +151,11 @@ export default function Register() {
         }
       }
 
+      // Mengidentifikasi kode error Firebase
       const errorCode =
-        typeof error === 'object' && error !== null && 'code' in error
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error
           ? String(error.code)
           : '';
 
@@ -192,6 +203,7 @@ export default function Register() {
         Daftarkan akun untuk menggunakan Presensi Praktikum
       </Text>
 
+      {/* Input nama */}
       <Text style={styles.label}>Nama Lengkap</Text>
       <TextInput
         style={styles.input}
@@ -202,6 +214,7 @@ export default function Register() {
         editable={!loading}
       />
 
+      {/* Input email */}
       <Text style={styles.label}>Email</Text>
       <TextInput
         style={styles.input}
@@ -214,6 +227,7 @@ export default function Register() {
         editable={!loading}
       />
 
+      {/* Input password */}
       <Text style={styles.label}>Password</Text>
       <TextInput
         style={styles.input}
@@ -224,6 +238,7 @@ export default function Register() {
         editable={!loading}
       />
 
+      {/* Pilihan role */}
       <Text style={styles.label}>Pilih Peran</Text>
 
       <View style={styles.roleContainer}>
@@ -249,6 +264,7 @@ export default function Register() {
         ))}
       </View>
 
+      {/* Tombol daftar */}
       <Pressable
         style={[
           styles.submitButton,
@@ -263,10 +279,26 @@ export default function Register() {
           <Text style={styles.submitText}>Daftar</Text>
         )}
       </Pressable>
+
+      {/* Navigasi ke halaman login */}
+      <View style={styles.loginContainer}>
+        <Text style={styles.loginText}>
+          Sudah punya akun?{' '}
+        </Text>
+
+        <Link href="/login" asChild>
+          <Pressable disabled={loading}>
+            <Text style={styles.loginLink}>
+              Masuk di sini
+            </Text>
+          </Pressable>
+        </Link>
+      </View>
     </View>
   );
 }
 
+// Styling halaman register
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -274,16 +306,19 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
   },
+
   title: {
     fontSize: 28,
     fontWeight: '800',
     color: '#111827',
   },
+
   subtitle: {
     color: '#6B7280',
     marginTop: 8,
     marginBottom: 28,
   },
+
   label: {
     fontSize: 14,
     fontWeight: '600',
@@ -291,6 +326,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 14,
   },
+
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -299,10 +335,12 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 14,
   },
+
   roleContainer: {
     flexDirection: 'row',
     gap: 12,
   },
+
   roleButton: {
     flex: 1,
     padding: 14,
@@ -312,17 +350,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
   },
+
   roleSelected: {
     backgroundColor: '#3730A3',
     borderColor: '#3730A3',
   },
+
   roleText: {
     color: '#374151',
     fontWeight: '600',
   },
+
   roleTextSelected: {
     color: '#FFFFFF',
   },
+
   submitButton: {
     backgroundColor: '#3730A3',
     padding: 16,
@@ -330,12 +372,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 28,
   },
+
   disabledButton: {
     opacity: 0.6,
   },
+
   submitText: {
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 15,
+  },
+
+  loginContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+
+  loginText: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+
+  loginLink: {
+    color: '#3730A3',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
