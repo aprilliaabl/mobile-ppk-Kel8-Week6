@@ -2,6 +2,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Appearance } from 'react-native';
+
+import FCMInitializer from '../components/FCMInitializer';
 import { W } from '../constants/warna';
 import { AuthProvider } from '../contexts/AuthContext';
 
@@ -13,7 +15,11 @@ if (typeof Appearance.setColorScheme === 'function') {
 export default function RootLayout() {
   return (
     <AuthProvider>
+      {/* Inisialisasi layanan Firebase Cloud Messaging */}
+      <FCMInitializer />
+
       <StatusBar style="light" />
+
       <Stack
         screenOptions={{
           headerShown: false,
