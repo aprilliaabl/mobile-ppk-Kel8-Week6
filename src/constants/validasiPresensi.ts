@@ -53,7 +53,7 @@ export const BATAS_AKURASI_GPS_METER = 150;
 export function evaluasiLokasiTerhadapLab(params: {
   statusLokasi: StatusLokasiPerangkat;
   koordinat: KoordinatPerangkat | null;
-  sesi: Pick<Sesi, 'ruang' | 'labId'> | undefined;
+  sesi: Pick<Sesi, 'ruang' | 'laboratoriumId'> | undefined;
   daftarLab?: Laboratorium[];
   errorDetail?: string | null;
 }): HasilPemeriksaanLokasi {
@@ -146,14 +146,14 @@ export function evaluasiLokasiTerhadapLab(params: {
     lab.latitude,
     lab.longitude
   );
-  const dalamRadius = jarakMeter <= lab.radiusMeter;
+  const dalamRadius = jarakMeter <= lab.radius;
 
   const infoLokasiPresensi: InfoLokasiPresensi = {
     latitude: koordinat.latitude,
     longitude: koordinat.longitude,
     accuracy: koordinat.accuracy ?? null,
     jarakMeter,
-    radiusMeter: lab.radiusMeter,
+    radiusMeter: lab.radius,
     labId: lab.id,
     namaLab: lab.nama,
   };
@@ -165,8 +165,8 @@ export function evaluasiLokasiTerhadapLab(params: {
     jarakMeter,
     dalamRadius,
     pesan: dalamRadius
-      ? `Lokasi berada dalam radius laboratorium (${jarakMeter}m dari maks. ${lab.radiusMeter}m).`
-      : `Lokasi berada di luar radius laboratorium (${jarakMeter}m dari batas radius ${lab.radiusMeter}m).`,
+      ? `Lokasi berada dalam radius laboratorium (${jarakMeter}m dari maks. ${lab.radius}m).`
+      : `Lokasi berada di luar radius laboratorium (${jarakMeter}m dari batas radius ${lab.radius}m).`,
     infoLokasiPresensi,
   };
 }

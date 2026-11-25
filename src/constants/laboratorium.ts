@@ -10,35 +10,39 @@ import type { Laboratorium, Sesi } from './types';
 export const DEFAULT_LABORATORIUM: Laboratorium[] = [
   {
     id: 'lab-komputer-1',
+    kode: 'LAB-KOMPUTER-1',
     nama: 'Lab Komputer 1',
     gedung: 'Gedung Laboratorium Terpadu Lt. 1',
     latitude: -7.76542,
     longitude: 110.37258,
-    radiusMeter: 100,
+    radius: 100,
   },
   {
     id: 'lab-komputer-2',
+    kode: 'LAB-KOMPUTER-2',
     nama: 'Lab Komputer 2',
     gedung: 'Gedung Laboratorium Terpadu Lt. 2',
     latitude: -7.76548,
     longitude: 110.37264,
-    radiusMeter: 100,
+    radius: 100,
   },
   {
     id: 'lab-komputer-3',
+    kode: 'LAB-KOMPUTER-3',
     nama: 'Lab Komputer 3',
     gedung: 'Gedung Laboratorium Terpadu Lt. 3',
     latitude: -7.76554,
     longitude: 110.37270,
-    radiusMeter: 100,
+    radius: 100,
   },
   {
     id: 'lab-jaringan',
+    kode: 'LAB-JARINGAN',
     nama: 'Lab Jaringan',
     gedung: 'Gedung Laboratorium Terpadu Lt. 2',
     latitude: -7.76560,
     longitude: 110.37275,
-    radiusMeter: 100,
+    radius: 100,
   },
 ];
 
@@ -69,12 +73,13 @@ function mulaiListenerLab() {
             dariServer.push({
               id: docSnap.id,
               nama: d.nama,
-              gedung: typeof d.gedung === 'string' ? d.gedung : undefined,
+              gedung: typeof d.gedung === 'string' ? d.gedung : 'Laboratorium Praktikum',
+              kode: typeof d.kode === 'string' ? d.kode : docSnap.id,
               latitude: d.latitude,
               longitude: d.longitude,
-              radiusMeter:
-                typeof d.radiusMeter === 'number' && d.radiusMeter > 0
-                  ? d.radiusMeter
+              radius:
+                typeof d.radius === 'number' && d.radius > 0
+                  ? d.radius
                   : 100,
             });
           }
@@ -122,15 +127,15 @@ export function useLaboratoriumList(): Laboratorium[] {
 }
 
 /**
- * Mencari data Laboratorium berdasarkan sesi (melalui `sesi.labId` atau pencocokan nama `sesi.ruang`).
+ * Mencari data Laboratorium berdasarkan sesi (melalui `sesi.laboratoriumId` atau pencocokan nama `sesi.ruang`).
  */
 export function cariLaboratoriumSesi(
-  sesi: Pick<Sesi, 'ruang' | 'labId'> | undefined,
+  sesi: Pick<Sesi, 'ruang' | 'laboratoriumId'> | undefined,
   daftarLab: Laboratorium[] = labState
 ): Laboratorium | undefined {
   if (!sesi) return undefined;
-  if (sesi.labId) {
-    const byId = daftarLab.find((l) => l.id === sesi.labId);
+  if (sesi.laboratoriumId) {
+    const byId = daftarLab.find((l) => l.id === sesi.laboratoriumId);
     if (byId) return byId;
   }
   const ruangNorm = sesi.ruang.trim().toLowerCase();
@@ -195,11 +200,12 @@ export function hitungJadwalPerLaboratorium(
       const idBaru = s.ruang.trim().toLowerCase().replace(/\s+/g, '-');
       semuaLab.push({
         id: idBaru,
+        kode: idBaru.toUpperCase(),
         nama: s.ruang.trim(),
         gedung: 'Laboratorium Praktikum',
         latitude: DEFAULT_LABORATORIUM[0].latitude,
         longitude: DEFAULT_LABORATORIUM[0].longitude,
-        radiusMeter: 100,
+        radius: 100,
       });
     }
   }

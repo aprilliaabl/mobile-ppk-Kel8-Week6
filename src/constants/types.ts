@@ -8,7 +8,7 @@ export interface Laboratorium {
   lantai?: number | string;
   latitude: number;
   longitude: number;
-  radius: number; // dalam meter (default: 25)
+  radius: number; // radius geofence dalam meter (default: 100)
   deskripsi?: string;
   createdAtIso?: string;
 }

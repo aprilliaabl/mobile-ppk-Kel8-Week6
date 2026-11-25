@@ -47,7 +47,7 @@ export function PetaLokasiPresensi({
         <View style={styles.radarHeader}>
           <Ikon nama="lokasi" size={20} color={W.blue} />
           <Text style={styles.radarTitle}>
-            Geofence {laboratorium.nama} (Radius {laboratorium.radiusMeter}m)
+            Geofence {laboratorium.nama} (Radius {laboratorium.radius}m)
           </Text>
         </View>
         <Text style={styles.coordText}>
