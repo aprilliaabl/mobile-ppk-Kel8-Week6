@@ -28,6 +28,7 @@ export const LAB_DEFAULT_LIST: Laboratorium[] = [
     latitude: -7.047909,
     longitude: 110.440866,
     radius: 10,
+    gracePeriodMinutes: 15,
     deskripsi: 'Praktikum Algoritma, Struktur Data, Pemrograman Berorientasi Objek',
   },
   {
@@ -39,6 +40,7 @@ export const LAB_DEFAULT_LIST: Laboratorium[] = [
     latitude: -7.048050,
     longitude: 110.440950,
     radius: 10,
+    gracePeriodMinutes: 15,
     deskripsi: 'Praktikum Jaringan Komputer, Sistem Operasi, dan IoT',
   },
   {
@@ -50,6 +52,7 @@ export const LAB_DEFAULT_LIST: Laboratorium[] = [
     latitude: -7.047820,
     longitude: 110.440780,
     radius: 10,
+    gracePeriodMinutes: 15,
     deskripsi: 'Praktikum Basis Data, Kecerdasan Buatan, Data Science',
   },
   {
@@ -61,6 +64,7 @@ export const LAB_DEFAULT_LIST: Laboratorium[] = [
     latitude: -7.048350,
     longitude: 110.441200,
     radius: 10,
+    gracePeriodMinutes: 15,
     deskripsi: 'Praktikum Rekayasa Perangkat Lunak, Multimedia, Grafika Komputer',
   },
 ];
@@ -96,6 +100,7 @@ function dariDoc(d: QueryDocumentSnapshot<DocumentData>): Laboratorium {
     latitude: Number(x.latitude ?? 0),
     longitude: Number(x.longitude ?? 0),
     radius: Number(x.radius ?? 25),
+    gracePeriodMinutes: Number(x.gracePeriodMinutes ?? 15),
     deskripsi: x.deskripsi ? String(x.deskripsi) : undefined,
     createdAtIso: x.createdAt?.toDate ? x.createdAt.toDate().toISOString() : undefined,
   };
@@ -169,6 +174,7 @@ export async function tambahLaboratorium(data: DataLaboratorium): Promise<string
     const docRef = await addDoc(collection(db!, COLLECTIONS.LABORATORIUM), {
       ...data,
       radius: data.radius ?? 25,
+      gracePeriodMinutes: data.gracePeriodMinutes ?? 15,
       createdAt: serverTimestamp(),
     });
     return docRef.id;
@@ -178,6 +184,7 @@ export async function tambahLaboratorium(data: DataLaboratorium): Promise<string
       ...data,
       id: newId,
       radius: data.radius ?? 25,
+      gracePeriodMinutes: data.gracePeriodMinutes ?? 15,
       createdAtIso: new Date().toISOString(),
     };
     cacheLab = [newLab, ...cacheLab];
