@@ -74,19 +74,14 @@ service cloud.firestore {
         && request.resource.data.nama.size() <= 100
         && request.resource.data.email is string
         && request.resource.data.email.size() > 0
-        && request.resource.data.role in [
-          'praktikan',
-          'asisten'
-        ]
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'praktikan'
         && request.resource.data.requestedRole in [
           'praktikan',
           'asisten'
         ]
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.accountStatus in [
-          'active',
-          'pending'
-        ];
+        && request.resource.data.accountStatus == (request.resource.data.requestedRole == 'asisten' ? 'pending' : 'active');
 
       // Pengguna tidak boleh mengubah identitas dan hak aksesnya sendiri.
       allow update: if isAuthenticated()

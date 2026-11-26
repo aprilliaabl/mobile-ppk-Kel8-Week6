@@ -115,8 +115,8 @@ export default function Login() {
         setCurrentUser({
           id: user.uid,
           nama: userData.nama || user.email || "Praktikan",
-          nim: userData.nim || "22/001",
-          kelas: userData.kelas || "IF-2B",
+          ...(typeof userData.nim === 'string' ? { nim: userData.nim } : {}),
+          ...(typeof userData.kelas === 'string' ? { kelas: userData.kelas } : {}),
           role: "praktikan",
         });
         router.replace("/praktikan/(tabs)/beranda" as never);
