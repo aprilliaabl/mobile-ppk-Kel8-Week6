@@ -8,7 +8,9 @@ export interface Laboratorium {
   lantai?: number | string;
   latitude: number;
   longitude: number;
-  radius: number; // radius geofence dalam meter (default: 100)
+  radius: number; // radius geofence dalam meter (default: 10)
+  gracePeriodMenit?: number; // durasi toleransi keterlambatan dalam menit (default: 15)
+  nominalDenda?: number; // nominal denda per keterlambatan dalam Rupiah (default: 10000)
   deskripsi?: string;
   createdAtIso?: string;
 }
@@ -24,6 +26,8 @@ export interface Sesi {
   latitude?: number;
   longitude?: number;
   radius?: number;
+  gracePeriodMenit?: number; // durasi toleransi menit untuk sesi ini (FR-02 & FR-14)
+  nominalDenda?: number; // nominal denda tetap untuk sesi ini (FR-15)
   waktuMulai: string;
   waktuSelesai: string;
   status: StatusSesi;
@@ -45,14 +49,41 @@ export interface UserDummy {
   role: Role;
 }
 
+export type StatusKehadiranPresensi = 'TEPAT_WAKTU' | 'TERLAMBAT' | 'IZIN_TERKONFIRMASI';
+
+export type StatusTagihanDenda = 'BELUM_DIBAYAR' | 'PENDING' | 'LUNAS' | 'DIBEBASKAN';
+
+export interface TagihanDenda {
+  /** Deterministic ID: `denda_${sesiId}_${praktikanId}` */
+  id: string;
+  praktikanId: string;
+  namaPraktikan: string;
+  nimPraktikan?: string;
+  sesiId: string;
+  namaSesi: string;
+  kelas: string;
+  presensiId?: string;
+  nominal: number;
+  status: StatusTagihanDenda;
+  alasan: string; // misal: "Keterlambatan presensi praktikum melebihi batas 15 menit"
+  menitKeterlambatan: number;
+  tanggalTagihan: string; // format tanggal
+  createdAtIso: string;
+  dibayarPada?: string;
+  orderIdMidtrans?: string;
+  snapToken?: string;
+}
+
 /** Satu baris rekap kehadiran yang ditampilkan asisten. */
 export interface BarisRekap {
   id: string;
   nama: string;
   nim: string;
   waktu: string; // contoh: "10.32.15"
-  /** Terlambat jika hadir lebih dari 15 menit setelah sesi dimulai. */
+  /** Terlambat jika hadir lebih dari grace period setelah sesi dimulai. */
   status: "TEPAT_WAKTU" | "TERLAMBAT";
+  menitKeterlambatan?: number;
+  tagihanDendaId?: string;
 }
 
 export type StatusIzin = "pending" | "disetujui" | "ditolak";
