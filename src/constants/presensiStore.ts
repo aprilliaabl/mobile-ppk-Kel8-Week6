@@ -34,6 +34,9 @@ export interface CatatanPresensi {
   waktuKehadiran: string; // contoh: "08.10.25"
   createdAtIso?: string;
   status: 'HADIR';
+  statusKetepatan?: 'TEPAT_WAKTU' | 'TERLAMBAT';
+  menitKeterlambatan?: number;
+  tagihanDendaId?: string;
   lokasi?: InfoLokasiPresensi;
 }
 
@@ -189,6 +192,11 @@ export async function submitPresensi(params: {
   inFlightKeys.add(docId);
   try {
     const now = new Date();
+    // FR-14 & FR-15: Hitung status keterlambatan berdasarkan waktu mulai sesi & grace period
+    const { hitungStatusKeterlambatan, buatTagihanDenda } = await import('./dendaStore');
+    const validasiLate = hitungStatusKeterlambatan(sesi, now);
+    const statusKetepatan = validasiLate.isTerlambat ? 'TERLAMBAT' : 'TEPAT_WAKTU';
+
     const record: CatatanPresensi = {
       id: docId,
       sesiId: sesi.id,
@@ -201,8 +209,28 @@ export async function submitPresensi(params: {
       waktuKehadiran: formatJamPresensi(now),
       createdAtIso: now.toISOString(),
       status: 'HADIR',
+      statusKetepatan,
+      menitKeterlambatan: validasiLate.menitKeterlambatan,
       ...(lokasi ? { lokasi } : {}),
     };
+
+    // FR-15: Jika terlambat, buat tagihan denda otomatis (idempotent, anti tagihan ganda)
+    if (validasiLate.isTerlambat) {
+      try {
+        const tagihan = await buatTagihanDenda({
+          sesi,
+          praktikanId: effectivePraktikanId,
+          namaPraktikan: praktikan.nama,
+          nimPraktikan: praktikan.nim,
+          presensiId: docId,
+          menitKeterlambatan: validasiLate.menitKeterlambatan,
+          nominal: validasiLate.nominalDenda,
+        });
+        record.tagihanDendaId = tagihan.id;
+      } catch (tagihanErr) {
+        console.warn('[Presensi] Gagal membuat tagihan denda otomatis:', tagihanErr);
+      }
+    }
 
     // Tulis ke Firestore apabila Firebase aktif dan sesi ini bukan data demo lokal (atau user sedang login Firebase)
     const isDemoLocalSesi = /^s-\d+$/.test(sesi.id);

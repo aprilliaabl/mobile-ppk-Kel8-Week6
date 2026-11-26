@@ -458,7 +458,8 @@ export function getRekapSesi(
   }
   const sesi = sesiState.find((x) => x.id === sesiId);
   const mulai = sesi ? new Date(sesi.waktuMulai) : new Date();
-  const batas = mulai.getHours() * 60 + mulai.getMinutes() + 15;
+  const gracePeriod = sesi?.gracePeriodMenit ?? 15;
+  const batas = mulai.getHours() * 60 + mulai.getMinutes() + gracePeriod;
 
   const semua: { id: string; nama: string; nim: string; waktu: string }[] = [
     ...(REKAP_DUMMY[sesiId] ?? []).map((p, i) => ({
@@ -478,10 +479,17 @@ export function getRekapSesi(
         waktu: p.waktuKehadiran,
       })),
   ];
-  return semua.map((p) => ({
-    ...p,
-    status: menitDariWaktu(p.waktu) <= batas ? "TEPAT_WAKTU" : "TERLAMBAT",
-  }));
+  return semua.map((p) => {
+    const menitPresensi = menitDariWaktu(p.waktu);
+    const isTerlambat = menitPresensi > batas;
+    const menitKeterlambatan = isTerlambat ? menitPresensi - batas : 0;
+    return {
+      ...p,
+      status: isTerlambat ? "TERLAMBAT" : "TEPAT_WAKTU",
+      menitKeterlambatan,
+      tagihanDendaId: isTerlambat ? `denda_${sesiId}_${p.id}` : undefined,
+    };
+  });
 }
 
 /**

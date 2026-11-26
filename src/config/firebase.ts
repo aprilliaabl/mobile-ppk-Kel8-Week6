@@ -94,4 +94,5 @@ export const COLLECTIONS = {
   PRESENSI: 'presensi',
   IZIN: 'izin',
   LABORATORIUM: 'laboratorium',
+  TAGIHAN: 'tagihan',
 } as const;
