@@ -9,6 +9,7 @@ export interface Laboratorium {
   latitude: number;
   longitude: number;
   radius: number; // radius geofence dalam meter (default: 100)
+  gracePeriodMinutes: number; // toleransi keterlambatan dalam menit
   deskripsi?: string;
   createdAtIso?: string;
 }

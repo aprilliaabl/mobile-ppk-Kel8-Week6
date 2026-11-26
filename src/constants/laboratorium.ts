@@ -81,6 +81,10 @@ function mulaiListenerLab() {
                 typeof d.radius === 'number' && d.radius > 0
                   ? d.radius
                   : 100,
+              gracePeriodMinutes:
+                typeof d.gracePeriodMinutes === 'number' && d.gracePeriodMinutes >= 0
+                  ? d.gracePeriodMinutes
+                  : 15,
             });
           }
         });

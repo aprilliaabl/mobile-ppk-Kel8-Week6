@@ -29,6 +29,7 @@ interface FormValues {
   latitude: string;
   longitude: string;
   radius: string;
+  gracePeriodMinutes: string;
   deskripsi: string;
 }
 
@@ -45,6 +46,7 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
     latitude: '-7.047909',
     longitude: '110.440866',
     radius: '10',
+    gracePeriodMinutes: '15',
     deskripsi: '',
   });
 
@@ -61,6 +63,7 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
           latitude: String(laboratorium.latitude),
           longitude: String(laboratorium.longitude),
           radius: String(laboratorium.radius ?? 10),
+          gracePeriodMinutes: String(laboratorium.gracePeriodMinutes ?? 15),
           deskripsi: laboratorium.deskripsi ?? '',
         });
       } else {
@@ -72,6 +75,7 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
           latitude: '-7.047909',
           longitude: '110.440866',
           radius: '10',
+          gracePeriodMinutes: '15',
           deskripsi: '',
         });
       }
@@ -90,6 +94,7 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
     const latNum = parseFloat(form.latitude);
     const lonNum = parseFloat(form.longitude);
     const radNum = parseFloat(form.radius);
+    const graceNum = parseInt(form.gracePeriodMinutes, 10);
 
     if (!namaTrim) {
       Alert.alert('Peringatan', 'Nama laboratorium wajib diisi.');
@@ -115,6 +120,10 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
       Alert.alert('Peringatan', 'Radius toleransi harus berupa angka lebih besar dari 0.');
       return;
     }
+    if (isNaN(graceNum) || graceNum < 0 || graceNum > 120) {
+      Alert.alert('Peringatan', 'Grace period harus berupa angka 0–120 menit.');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -128,6 +137,7 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
         latitude: latNum,
         longitude: lonNum,
         radius: radNum,
+        gracePeriodMinutes: graceNum,
         deskripsi: form.deskripsi.trim() || undefined,
       };
 
@@ -204,6 +214,13 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
           k: 'radius',
           label: 'Radius Toleransi Presensi (Meter)',
           placeholder: '25',
+          keyboard: 'numeric',
+        })}
+
+        {Field({
+          k: 'gracePeriodMinutes',
+          label: 'Grace Period Keterlambatan (Menit)',
+          placeholder: '15',
           keyboard: 'numeric',
         })}
 

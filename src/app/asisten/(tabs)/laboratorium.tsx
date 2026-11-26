@@ -92,6 +92,17 @@ export default function KelolaLaboratoriumScreen() {
 
             <Text style={styles.gedung}>{item.gedung}</Text>
 
+            <View style={styles.configRow}>
+              <View style={styles.configItem}>
+                <Text style={styles.configLabel}>Radius Presensi</Text>
+                <Text style={styles.configValue}>{item.radius} meter</Text>
+              </View>
+              <View style={styles.configItem}>
+                <Text style={styles.configLabel}>Grace Period</Text>
+                <Text style={styles.configValue}>{item.gracePeriodMinutes} menit</Text>
+              </View>
+            </View>
+
             <View style={styles.geoRow}>
               <Text style={styles.geoLabel}>📍 Koordinat:</Text>
               <Text style={styles.geoValue}>
@@ -145,6 +156,19 @@ const styles = StyleSheet.create({
   },
   radiusText: { color: W.green, fontSize: 11, fontWeight: '800' },
   gedung: { fontSize: 13, color: W.sub },
+  configRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 2,
+  },
+  configItem: {
+    flex: 1,
+    backgroundColor: W.cardAlt,
+    padding: 9,
+    borderRadius: 8,
+  },
+  configLabel: { fontSize: 10, color: W.sub, fontWeight: '700' },
+  configValue: { fontSize: 12, color: W.text, fontWeight: '800', marginTop: 2 },
   geoRow: {
     flexDirection: 'row',
     alignItems: 'center',
