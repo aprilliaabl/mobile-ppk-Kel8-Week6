@@ -65,7 +65,7 @@ export const LAB_DEFAULT_LIST: Laboratorium[] = [
   },
 ];
 
-let cacheLab: Laboratorium[] = [...LAB_DEFAULT_LIST];
+let cacheLab: Laboratorium[] = [];
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -103,22 +103,9 @@ function dariDoc(d: QueryDocumentSnapshot<DocumentData>): Laboratorium {
 
 export const labAktif = (): boolean => isFirebaseConfigured && !!db;
 
+/** Auto-seed dimatikan: data laboratorium harus dibuat oleh asisten di Firestore. */
 export async function seedLaboratoriumKeFirestore(): Promise<void> {
-  if (!labAktif()) return;
-
-  const colRef = collection(db!, COLLECTIONS.LABORATORIUM);
-  const snap = await getDocs(colRef);
-
-  // Jika di Firestore belum ada sama sekali, push 4 lab default
-  if (snap.empty) {
-    for (const lab of LAB_DEFAULT_LIST) {
-      const { id, ...data } = lab;
-      await setDoc(doc(colRef, id), {
-        ...data,
-        createdAt: serverTimestamp(),
-      });
-    }
-  }
+  return;
 }
 
 export function dengarLaboratorium(onData: (list: Laboratorium[]) => void, onError?: (err: Error) => void) {
@@ -127,18 +114,14 @@ export function dengarLaboratorium(onData: (list: Laboratorium[]) => void, onErr
     return () => {};
   }
 
-  // Jalankan auto-seed di background jika Firestore masih kosong
-  seedLaboratoriumKeFirestore().catch((err) => {
-    console.warn('[Laboratorium] Gagal auto-seed ke Firestore:', err);
-  });
-
   const q = query(collection(db!, COLLECTIONS.LABORATORIUM), orderBy('nama', 'asc'));
   return onSnapshot(
     q,
     (snap) => {
       if (snap.empty) {
-        // Jika koleksi di Firestore masih kosong, pakai data default
-        onData([...LAB_DEFAULT_LIST]);
+        // Koleksi cloud kosong: tampilkan empty state, bukan data demo.
+        cacheLab = [];
+        onData([]);
       } else {
         const list = snap.docs.map(dariDoc);
         onData(list);
@@ -147,7 +130,8 @@ export function dengarLaboratorium(onData: (list: Laboratorium[]) => void, onErr
     (err) => {
       console.warn('[Laboratorium] Gagal berlangganan Firestore:', err);
       if (onError) onError(err);
-      onData([...cacheLab]);
+      cacheLab = [];
+      onData([]);
     }
   );
 }
@@ -173,16 +157,7 @@ export async function tambahLaboratorium(data: DataLaboratorium): Promise<string
     });
     return docRef.id;
   } else {
-    const newId = `lab-${Date.now()}`;
-    const newLab: Laboratorium = {
-      ...data,
-      id: newId,
-      radius: data.radius ?? 25,
-      createdAtIso: new Date().toISOString(),
-    };
-    cacheLab = [newLab, ...cacheLab];
-    emitChange();
-    return newId;
+    throw new Error('Firebase belum dikonfigurasi. Data laboratorium tidak disimpan lokal.');
   }
 }
 
@@ -194,8 +169,7 @@ export async function ubahLaboratorium(id: string, data: Partial<DataLaboratoriu
       updatedAt: serverTimestamp(),
     });
   } else {
-    cacheLab = cacheLab.map((item) => (item.id === id ? { ...item, ...data } : item));
-    emitChange();
+    throw new Error('Firebase belum dikonfigurasi. Perubahan laboratorium tidak disimpan lokal.');
   }
 }
 
@@ -204,7 +178,6 @@ export async function hapusLaboratorium(id: string): Promise<void> {
     const ref = doc(db!, COLLECTIONS.LABORATORIUM, id);
     await deleteDoc(ref);
   } else {
-    cacheLab = cacheLab.filter((item) => item.id !== id);
-    emitChange();
+    throw new Error('Firebase belum dikonfigurasi. Laboratorium tidak dihapus lokal.');
   }
 }

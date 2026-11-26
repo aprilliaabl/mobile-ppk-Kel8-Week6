@@ -60,26 +60,10 @@ export function formatTanggalPresensi(d: Date): string {
   return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN_PENDEK[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-const SEED_PRESENSI: CatatanPresensi[] = [
-  {
-    id: 's-hist-1_u-2',
-    sesiId: 's-hist-1',
-    namaSesi: 'Praktikum Algoritma & Pemrograman',
-    kelas: 'IF-2B',
-    praktikanId: 'u-2',
-    namaPraktikan: 'Didi',
-    nimPraktikan: '22/001',
-    tanggal: 'Kamis, 15 Okt 2026',
-    waktuKehadiran: '08.05.12',
-    createdAtIso: '2026-10-15T01:05:12.000Z',
-    status: 'HADIR',
-  },
-];
+// Data presensi tidak di-seed dari kode. Snapshot awal kosong dan diisi listener Firestore.
+export const presensiStore: CatatanPresensi[] = [];
 
-// In-memory store yang disinkronkan dengan Firestore (dan fallback lokal jika .env belum diisi)
-export const presensiStore: CatatanPresensi[] = [...SEED_PRESENSI];
-
-let presensiSnapshot: CatatanPresensi[] = [...presensiStore];
+let presensiSnapshot: CatatanPresensi[] = [];
 const listeners = new Set<() => void>();
 const inFlightKeys = new Set<string>();
 
@@ -130,7 +114,7 @@ export function catatPresensi(
   const record: CatatanPresensi = {
     ...data,
     id: docId,
-    nimPraktikan: data.nimPraktikan ?? '22/001',
+    nimPraktikan: data.nimPraktikan,
     createdAtIso: data.createdAtIso ?? new Date().toISOString(),
     status: 'HADIR',
   };
@@ -212,7 +196,7 @@ export async function submitPresensi(params: {
       kelas: sesi.kelas,
       praktikanId: effectivePraktikanId,
       namaPraktikan: praktikan.nama,
-      nimPraktikan: praktikan.nim ?? '22/001',
+      nimPraktikan: praktikan.nim,
       tanggal: formatTanggalPresensi(now),
       waktuKehadiran: formatJamPresensi(now),
       createdAtIso: now.toISOString(),
@@ -373,6 +357,6 @@ export function useRiwayatPraktikan(praktikanId: string): CatatanPresensi[] {
 }
 
 export function resetPresensiDemo() {
-  presensiStore.splice(0, presensiStore.length, ...SEED_PRESENSI);
+  presensiStore.splice(0, presensiStore.length);
   emitPresensi();
 }
