@@ -1,3 +1,4 @@
+
 export type StatusSesi = "belum_dibuka" | "dibuka" | "ditutup";
 
 export interface Laboratorium {
@@ -9,7 +10,7 @@ export interface Laboratorium {
   latitude: number;
   longitude: number;
   radius: number; // radius geofence dalam meter (default: 10)
-  gracePeriodMenit?: number; // durasi toleransi keterlambatan dalam menit (default: 15)
+  gracePeriodMinutes: number; // toleransi keterlambatan dalam menit (default: 15)
   nominalDenda?: number; // nominal denda per keterlambatan dalam Rupiah (default: 10000)
   deskripsi?: string;
   createdAtIso?: string;
@@ -49,9 +50,16 @@ export interface UserDummy {
   role: Role;
 }
 
-export type StatusKehadiranPresensi = 'TEPAT_WAKTU' | 'TERLAMBAT' | 'IZIN_TERKONFIRMASI';
+export type StatusKehadiranPresensi =
+  | 'TEPAT_WAKTU'
+  | 'TERLAMBAT'
+  | 'IZIN_TERKONFIRMASI';
 
-export type StatusTagihanDenda = 'BELUM_DIBAYAR' | 'PENDING' | 'LUNAS' | 'DIBEBASKAN';
+export type StatusTagihanDenda =
+  | 'BELUM_DIBAYAR'
+  | 'PENDING'
+  | 'LUNAS'
+  | 'DIBEBASKAN';
 
 export interface TagihanDenda {
   /** Deterministic ID: `denda_${sesiId}_${praktikanId}` */
@@ -65,9 +73,9 @@ export interface TagihanDenda {
   presensiId?: string;
   nominal: number;
   status: StatusTagihanDenda;
-  alasan: string; // misal: "Keterlambatan presensi praktikum melebihi batas 15 menit"
+  alasan: string;
   menitKeterlambatan: number;
-  tanggalTagihan: string; // format tanggal
+  tanggalTagihan: string;
   createdAtIso: string;
   dibayarPada?: string;
   orderIdMidtrans?: string;
@@ -79,7 +87,7 @@ export interface BarisRekap {
   id: string;
   nama: string;
   nim: string;
-  waktu: string; // contoh: "10.32.15"
+  waktu: string;
   /** Terlambat jika hadir lebih dari grace period setelah sesi dimulai. */
   status: "TEPAT_WAKTU" | "TERLAMBAT";
   menitKeterlambatan?: number;
@@ -134,5 +142,14 @@ export interface PengajuanIzin {
 /** Data yang diisi asisten pada form tambah/ubah sesi. */
 export type DataSesi = Pick<
   Sesi,
-  "nama" | "kelas" | "ruang" | "waktuMulai" | "waktuSelesai" | "jumlahPeserta" | "laboratoriumId" | "latitude" | "longitude" | "radius"
+  | "nama"
+  | "kelas"
+  | "ruang"
+  | "waktuMulai"
+  | "waktuSelesai"
+  | "jumlahPeserta"
+  | "laboratoriumId"
+  | "latitude"
+  | "longitude"
+  | "radius"
 >;
