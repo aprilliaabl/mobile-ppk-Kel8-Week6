@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PerubahanSesi, usePerubahanSesi } from '../constants/dummy';
+import { PerubahanSesi, usePerubahanSesi } from '../constants/sesiStore';
 import { W } from '../constants/warna';
 
 const native = Platform.OS !== 'web';
 
 /**
  * FR-09: pemberitahuan singkat di bagian atas layar saat pengguna lain mengubah status sesi.
- * Isi `kelas` untuk praktikan supaya hanya sesi kelasnya yang diberitahukan.
+ * Isi `kelasList` untuk praktikan supaya hanya sesi kelasnya yang diberitahukan.
  */
-export function ToastStatusSesi({ kelas }: { kelas?: string }) {
+export function ToastStatusSesi({ kelasList }: { kelasList?: string[] }) {
   const insets = useSafeAreaInsets();
   const perubahan = usePerubahanSesi();
   const [anim] = useState(() => new Animated.Value(0));
@@ -19,8 +19,10 @@ export function ToastStatusSesi({ kelas }: { kelas?: string }) {
 
   if (perubahan && perubahan.kunci !== lastKey) {
     setLastKey(perubahan.kunci);
+    // Asisten (kelasList tidak diisi) menerima semua; praktikan hanya untuk kelas miliknya.
     const cocokKelas =
-      !kelas || perubahan.sesi.kelas.trim().toUpperCase() === kelas.trim().toUpperCase();
+      kelasList === undefined ||
+      kelasList.some((k) => k.trim().toUpperCase() === perubahan.sesi.kelas.trim().toUpperCase());
     if (cocokKelas) {
       setTampil(perubahan);
     }

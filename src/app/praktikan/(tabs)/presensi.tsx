@@ -19,13 +19,8 @@ import { InfoRow } from '../../../components/InfoRow';
 import { PetaLokasiPresensi } from '../../../components/PetaLokasiPresensi';
 import { ErrorState, LoadingState } from '../../../components/StateView';
 import { StatusBadge } from '../../../components/StatusBadge';
-import {
-  muatUlangSesi,
-  sesiBerkaitan,
-  useCurrentUser,
-  useSesiList,
-  useSesiStatus,
-} from '../../../constants/dummy';
+import { muatUlangSesi, sesiBerkaitan, useSesiList, useSesiStatus } from '../../../constants/sesiStore';
+import { useCurrentUser } from '../../../hooks/use-current-user';
 import {
   formatJamRentang,
   formatTanggal,
@@ -68,8 +63,6 @@ export default function HalamanPresensiPraktikan() {
     canAskAgain,
     segarkanLokasi,
     bukaPengaturanIzin,
-    setKoordinatSimulasi,
-    isSimulasi,
   } = useLokasiPresensi();
 
   // Filter hanya sesi yang berkaitan dengan kelas praktikan (FR-06)
@@ -341,7 +334,6 @@ export default function HalamanPresensiPraktikan() {
                   </Text>
                   <Pressable
                     onPress={() => {
-                      setKoordinatSimulasi(null);
                       void segarkanLokasi();
                     }}
                     style={styles.refreshBtn}
@@ -358,68 +350,6 @@ export default function HalamanPresensiPraktikan() {
                   jarakMeter={validasi.hasilLokasi.jarakMeter}
                   dalamRadius={validasi.hasilLokasi.dalamRadius}
                 />
-
-                {/* Panel Simulasi Koordinat GPS untuk Pengujian di Emulator / Demo */}
-                {lab && (
-                  <View style={styles.simGeoBox}>
-                    <Text style={styles.simGeoTitle}>
-                      SIMULASI LOKASI GPS (UJI COBA EMULATOR)
-                    </Text>
-                    <View style={styles.simGeoRow}>
-                      <Pressable
-                        onPress={() =>
-                          setKoordinatSimulasi({
-                            latitude: lab.latitude + 0.00015,
-                            longitude: lab.longitude + 0.00015,
-                            accuracy: 12,
-                            mocked: false,
-                          })
-                        }
-                        style={[
-                          styles.simChip,
-                          isSimulasi &&
-                            validasi.hasilLokasi.dalamRadius &&
-                            styles.simChipActiveOk,
-                        ]}
-                      >
-                        <Text style={styles.simChipText}>
-                          Dalam Radius (~23m)
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() =>
-                          setKoordinatSimulasi({
-                            latitude: lab.latitude + 0.0032,
-                            longitude: lab.longitude + 0.0032,
-                            accuracy: 15,
-                            mocked: false,
-                          })
-                        }
-                        style={[
-                          styles.simChip,
-                          isSimulasi &&
-                            !validasi.hasilLokasi.dalamRadius &&
-                            styles.simChipActiveBad,
-                        ]}
-                      >
-                        <Text style={styles.simChipText}>
-                          Luar Radius (~490m)
-                        </Text>
-                      </Pressable>
-                      {isSimulasi && (
-                        <Pressable
-                          onPress={() => {
-                            setKoordinatSimulasi(null);
-                            void segarkanLokasi();
-                          }}
-                          style={styles.simChip}
-                        >
-                          <Text style={styles.simChipText}>GPS Asli</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  </View>
-                )}
               </View>
 
               <Button
@@ -670,7 +600,7 @@ export default function HalamanPresensiPraktikan() {
               <View style={styles.dRow}>
                 <Text style={styles.dLabel}>Nama Praktikan</Text>
                 <Text style={styles.dValue}>
-                  {praktikan.nama} ({praktikan.nim ?? '22/001'})
+                  {praktikan.nama} ({praktikan.nim ?? '-'})
                 </Text>
               </View>
               <View style={styles.dRow}>
@@ -840,32 +770,6 @@ const styles = StyleSheet.create({
     backgroundColor: W.blueSoft,
   },
   refreshText: { fontSize: 11, fontWeight: '800', color: W.blue },
-  simGeoBox: {
-    backgroundColor: W.bg,
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: W.line,
-  },
-  simGeoTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: W.sub,
-    letterSpacing: 0.5,
-  },
-  simGeoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  simChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: W.cardAlt,
-    borderWidth: 1,
-    borderColor: W.line,
-  },
-  simChipActiveOk: { backgroundColor: W.greenSoft, borderColor: W.green },
-  simChipActiveBad: { backgroundColor: W.redSoft, borderColor: W.red },
-  simChipText: { fontSize: 11, fontWeight: '700', color: W.text },
   checkListBox: { gap: 10 },
   checkItem: {
     backgroundColor: W.bg,

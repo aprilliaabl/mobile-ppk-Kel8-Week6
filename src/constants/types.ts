@@ -11,6 +11,7 @@ export interface Laboratorium {
   radius: number; // radius geofence dalam meter (default: 100)
   gracePeriodMinutes: number; // toleransi keterlambatan dalam menit
   deskripsi?: string;
+  mataKuliah?: string;
   createdAtIso?: string;
 }
 
@@ -38,11 +39,31 @@ export interface Sesi {
 
 export type Role = "asisten" | "praktikan";
 
-export interface UserDummy {
+/** Profil pengguna yang sedang login untuk salah satu peran aktifnya. */
+export interface Pengguna {
   id: string;
   nama: string;
+  email?: string;
   nim?: string;
+  /** Kelas utama (dari profil atau keanggotaan laboratorium pertama). */
   kelas?: string;
+  /** Semua kelas tempat pengguna terdaftar sebagai praktikan. */
+  kelasList?: string[];
+  role: Role;
+}
+
+/** Alias lama agar kode yang masih memakai nama ini tetap kompatibel. */
+export type UserDummy = Pengguna;
+
+/** Keanggotaan seseorang pada sebuah laboratorium (praktikan atau asprak). */
+export interface Anggota {
+  /** `${laboratoriumId}_${userId}` */
+  id: string;
+  userId: string;
+  laboratoriumId: string;
+  nim: string;
+  nama: string;
+  kelas: string;
   role: Role;
 }
 

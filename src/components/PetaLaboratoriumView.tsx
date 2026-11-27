@@ -11,7 +11,7 @@ import {
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import { useLaboratoriumList } from '../constants/laboratoriumStore';
-import { useSesiList } from '../constants/dummy';
+import { useSesiList } from '../constants/sesiStore';
 import type { Laboratorium } from '../constants/types';
 import { W } from '../constants/warna';
 
@@ -89,7 +89,7 @@ export function PetaLaboratoriumView() {
 
   // Template HTML Leaflet Interaktif (Kompatibel 100% Android WebView & Browser Web)
   const renderLeafletHTML = () => {
-    const labsJson = JSON.stringify(labList);
+    const labsJson = JSON.stringify(labList).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
     const userLat = lokasiUser ? lokasiUser.latitude : null;
     const userLng = lokasiUser ? lokasiUser.longitude : null;
     const activeLabId = selectedLab ? selectedLab.id : null;
@@ -177,7 +177,7 @@ export function PetaLaboratoriumView() {
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>🗺️ Peta Interaktif Laboratorium</Text>
           <Text style={styles.subtitle}>
-            FSM Undip • Radius Presensi 10 Meter
+            Ketuk marker untuk melihat info laboratorium
           </Text>
         </View>
         <View style={styles.gpsBadge}>

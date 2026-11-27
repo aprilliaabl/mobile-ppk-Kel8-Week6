@@ -9,7 +9,10 @@ import {
   where,
 } from 'firebase/firestore';
 import { auth, COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
-import type { Sesi, UserDummy } from './types';
+import { hitungJarakMeter } from './laboratorium';
+import type { Pengguna, Sesi } from './types';
+
+const GRACE_BAWAAN_MENIT_PRESENSI = 15;
 
 export interface InfoLokasiPresensi {
   latitude: number;
@@ -34,7 +37,14 @@ export interface CatatanPresensi {
   waktuKehadiran: string; // contoh: "08.10.25"
   createdAtIso?: string;
   status: 'HADIR';
+  /** ID laboratorium tempat presensi dilakukan (FR-18). */
+  labId?: string;
   lokasi?: InfoLokasiPresensi;
+  /** Jarak perangkat ke laboratorium saat presensi (meter). */
+  jarakMeter?: number;
+  /** true jika hadir melewati batas toleransi (grace period) laboratorium. */
+  terlambat?: boolean;
+  menitTerlambat?: number;
 }
 
 export interface HasilSubmitPresensi {
@@ -60,24 +70,8 @@ export function formatTanggalPresensi(d: Date): string {
   return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN_PENDEK[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-const SEED_PRESENSI: CatatanPresensi[] = [
-  {
-    id: 's-hist-1_u-2',
-    sesiId: 's-hist-1',
-    namaSesi: 'Praktikum Algoritma & Pemrograman',
-    kelas: 'IF-2B',
-    praktikanId: 'u-2',
-    namaPraktikan: 'Didi',
-    nimPraktikan: '22/001',
-    tanggal: 'Kamis, 15 Okt 2026',
-    waktuKehadiran: '08.05.12',
-    createdAtIso: '2026-10-15T01:05:12.000Z',
-    status: 'HADIR',
-  },
-];
-
-// In-memory store yang disinkronkan dengan Firestore (dan fallback lokal jika .env belum diisi)
-export const presensiStore: CatatanPresensi[] = [...SEED_PRESENSI];
+// Cache dalam memori yang disinkronkan dari Firestore secara real-time
+export const presensiStore: CatatanPresensi[] = [];
 
 let presensiSnapshot: CatatanPresensi[] = [...presensiStore];
 const listeners = new Set<() => void>();
@@ -99,74 +93,36 @@ export function getPresensiSnapshot(): CatatanPresensi[] {
   return presensiSnapshot;
 }
 
-// Helper untuk menambah catatan presensi secara sinkron dengan validasi duplikasi
-export function catatPresensi(
-  data: CatatanPresensi,
-  statusSesiSaatIni: Sesi['status'] = 'dibuka'
-): HasilSubmitPresensi {
-  if (!data.sesiId?.trim() || !data.praktikanId?.trim() || !data.namaPraktikan?.trim()) {
-    return { ok: false, error: 'Data praktikan atau sesi tidak valid.' };
-  }
-  if (statusSesiSaatIni !== 'dibuka') {
-    return {
-      ok: false,
-      error:
-        statusSesiSaatIni === 'belum_dibuka'
-          ? 'Presensi ditolak karena sesi praktikum belum dibuka.'
-          : 'Presensi ditolak karena sesi praktikum sudah ditutup.',
-    };
-  }
+/** Galat dengan pesan yang siap ditampilkan ke praktikan. */
+class GalatPresensi extends Error {}
 
-  const docId = buatIdPresensi(data.sesiId, data.praktikanId);
-  const sudahAda = presensiStore.some(
-    (p) =>
-      buatIdPresensi(p.sesiId, p.praktikanId) === docId ||
-      (p.sesiId === data.sesiId && p.praktikanId === data.praktikanId)
-  );
-  if (sudahAda) {
-    return { ok: false, error: 'Kamu sudah melakukan presensi pada sesi ini.' };
-  }
-
-  const record: CatatanPresensi = {
-    ...data,
-    id: docId,
-    nimPraktikan: data.nimPraktikan ?? '22/001',
-    createdAtIso: data.createdAtIso ?? new Date().toISOString(),
-    status: 'HADIR',
-  };
-
-  presensiStore.unshift(record);
-  emitPresensi();
-  return { ok: true, data: record };
+/** Firestore menolak nilai `undefined`, jadi field kosong dibuang sebelum disimpan. */
+function bersihkan<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }
 
 /**
- * FR-07: Submit presensi dengan validasi status sesi, ID deterministik,
- * proteksi transaksi Firestore (jika terkonfigurasi), dan pencegahan duplikasi.
+ * FR-07 & FR-18: mencatat presensi di dalam transaksi Firestore.
+ * Di dalam transaksi diperiksa ulang: sesi sedang dibuka, belum pernah presensi, dan jarak ke
+ * laboratorium dihitung dari koordinat laboratorium di server (bukan angka dari tampilan).
  */
 export async function submitPresensi(params: {
   sesi: Sesi | undefined;
-  praktikan: UserDummy | undefined;
+  praktikan: Pengguna | undefined;
   lokasi?: InfoLokasiPresensi;
-  requireAuth?: boolean;
   requireLokasi?: boolean;
 }): Promise<HasilSubmitPresensi> {
-  const {
-    sesi,
-    praktikan,
-    lokasi,
-    requireAuth = false,
-    requireLokasi = false,
-  } = params;
+  const { sesi, praktikan, lokasi, requireLokasi = true } = params;
 
-  if (!sesi || !sesi.id?.trim()) {
-    return { ok: false, error: 'Sesi praktikum tidak ditemukan.' };
-  }
+  if (!sesi || !sesi.id?.trim()) return { ok: false, error: 'Sesi praktikum tidak ditemukan.' };
   if (!praktikan || !praktikan.id?.trim() || praktikan.role !== 'praktikan') {
-    return { ok: false, error: 'User tidak terautentikasi atau bukan praktikan.' };
+    return { ok: false, error: 'Akun tidak dikenali sebagai praktikan.' };
   }
-  if (requireAuth && (!auth || !auth.currentUser)) {
-    return { ok: false, error: 'Sesi autentikasi tidak ditemukan. Silakan login terlebih dahulu.' };
+  if (!isFirebaseConfigured || !db) {
+    return { ok: false, error: 'Firebase belum dikonfigurasi. Periksa file .env.' };
+  }
+  if (!auth?.currentUser || auth.currentUser.uid !== praktikan.id) {
+    return { ok: false, error: 'Sesi login tidak ditemukan. Silakan login kembali.' };
   }
   if (sesi.status !== 'dibuka') {
     return {
@@ -178,99 +134,101 @@ export async function submitPresensi(params: {
     };
   }
   if (requireLokasi && !lokasi) {
-    return {
-      ok: false,
-      error: 'Lokasi perangkat tidak dapat diperoleh. Pastikan GPS dan izin lokasi aktif.',
-    };
-  }
-  if (lokasi && lokasi.jarakMeter > lokasi.radiusMeter) {
-    return {
-      ok: false,
-      error: `Presensi ditolak karena lokasi berada di luar radius laboratorium (${lokasi.jarakMeter}m > ${lokasi.radiusMeter}m).`,
-    };
+    return { ok: false, error: 'Lokasi perangkat tidak dapat diperoleh. Pastikan GPS dan izin lokasi aktif.' };
   }
 
-  // Jika user login via Firebase Auth, gunakan UID yang terautentikasi untuk memenuhi firestore.rules
-  const effectivePraktikanId =
-    isFirebaseConfigured && auth?.currentUser ? auth.currentUser.uid : praktikan.id;
-
-  const docId = buatIdPresensi(sesi.id, effectivePraktikanId);
-  if (inFlightKeys.has(docId)) {
-    return { ok: false, error: 'Permintaan presensi sedang diproses.' };
-  }
-  if (cekSudahPresensi(sesi.id, effectivePraktikanId)) {
-    return { ok: false, error: 'Kamu sudah tercatat hadir pada sesi ini.' };
-  }
+  const uid = auth.currentUser.uid;
+  const docId = buatIdPresensi(sesi.id, uid);
+  if (inFlightKeys.has(docId)) return { ok: false, error: 'Permintaan presensi sedang diproses.' };
+  if (cekSudahPresensi(sesi.id, uid)) return { ok: false, error: 'Kamu sudah tercatat hadir pada sesi ini.' };
 
   inFlightKeys.add(docId);
   try {
+    const firestoreDb = db;
     const now = new Date();
-    const record: CatatanPresensi = {
-      id: docId,
-      sesiId: sesi.id,
-      namaSesi: sesi.nama,
-      kelas: sesi.kelas,
-      praktikanId: effectivePraktikanId,
-      namaPraktikan: praktikan.nama,
-      nimPraktikan: praktikan.nim ?? '22/001',
-      tanggal: formatTanggalPresensi(now),
-      waktuKehadiran: formatJamPresensi(now),
-      createdAtIso: now.toISOString(),
-      status: 'HADIR',
-      ...(lokasi ? { lokasi } : {}),
-    };
+    let hasil!: CatatanPresensi;
 
-    // Tulis ke Firestore apabila Firebase aktif dan sesi ini bukan data demo lokal (atau user sedang login Firebase)
-    const isDemoLocalSesi = /^s-\d+$/.test(sesi.id);
-    if (isFirebaseConfigured && db && (auth?.currentUser || !isDemoLocalSesi)) {
-      if (!auth?.currentUser) {
-        throw new Error('UNAUTHENTICATED');
+    await runTransaction(firestoreDb, async (tx) => {
+      const sesiRef = doc(firestoreDb, COLLECTIONS.SESI, sesi.id);
+      const presensiRef = doc(firestoreDb, COLLECTIONS.PRESENSI, docId);
+      const [sesiSnap, presensiSnap] = await Promise.all([tx.get(sesiRef), tx.get(presensiRef)]);
+
+      if (!sesiSnap.exists()) throw new GalatPresensi('Sesi praktikum tidak ditemukan di server.');
+      const dataSesi = sesiSnap.data();
+      if (dataSesi.status !== 'dibuka') throw new GalatPresensi('Presensi ditolak karena sesi di server tidak sedang dibuka.');
+      if (presensiSnap.exists()) throw new GalatPresensi('Kamu sudah melakukan presensi pada sesi ini.');
+
+      // Koordinat, radius, dan grace period diambil dari dokumen laboratorium (acuan FR-19).
+      const labId: string | undefined = dataSesi.laboratoriumId ? String(dataSesi.laboratoriumId) : undefined;
+      let infoLokasi: InfoLokasiPresensi | undefined;
+      let grace = GRACE_BAWAAN_MENIT_PRESENSI;
+      if (labId) {
+        const labSnap = await tx.get(doc(firestoreDb, COLLECTIONS.LABORATORIUM, labId));
+        if (labSnap.exists()) {
+          const lab = labSnap.data();
+          grace = Number(lab.gracePeriodMinutes ?? GRACE_BAWAAN_MENIT_PRESENSI);
+          if (lokasi) {
+            const jarak = hitungJarakMeter(lokasi.latitude, lokasi.longitude, Number(lab.latitude), Number(lab.longitude));
+            const radius = Number(lab.radius ?? 25);
+            if (jarak > radius) {
+              throw new GalatPresensi(
+                `Presensi ditolak karena kamu berada di luar radius laboratorium (${jarak} m dari titik lab, radius ${radius} m).`
+              );
+            }
+            infoLokasi = bersihkan({
+              latitude: lokasi.latitude,
+              longitude: lokasi.longitude,
+              accuracy: typeof lokasi.accuracy === 'number' ? lokasi.accuracy : undefined,
+              jarakMeter: jarak,
+              radiusMeter: radius,
+              labId,
+              namaLab: String(lab.nama ?? ''),
+            }) as InfoLokasiPresensi;
+          }
+        } else if (requireLokasi) {
+          throw new GalatPresensi('Data laboratorium sesi ini tidak ditemukan. Hubungi asisten.');
+        }
+      } else if (requireLokasi) {
+        throw new GalatPresensi('Sesi ini belum dikaitkan dengan laboratorium, sehingga lokasi tidak dapat diperiksa.');
       }
-      const firestoreDb = db;
-      await runTransaction(firestoreDb, async (tx) => {
-        const sesiRef = doc(firestoreDb, COLLECTIONS.SESI, sesi.id);
-        const presensiRef = doc(firestoreDb, COLLECTIONS.PRESENSI, docId);
 
-        const [sesiSnap, presensiSnap] = await Promise.all([
-          tx.get(sesiRef),
-          tx.get(presensiRef),
-        ]);
+      const mulai = new Date(String(dataSesi.waktuMulai));
+      const selisihMenit = Math.floor((now.getTime() - mulai.getTime()) / 60000);
+      const terlambat = !Number.isNaN(mulai.getTime()) && selisihMenit > grace;
 
-        if (!sesiSnap.exists()) {
-          if (!isDemoLocalSesi) {
-            throw new Error('SESSION_NOT_FOUND');
-          }
-        } else {
-          const serverStatus = sesiSnap.data()?.status;
-          if (serverStatus !== 'dibuka') {
-            throw new Error('SESSION_NOT_OPEN');
-          }
-        }
-        if (presensiSnap.exists()) {
-          throw new Error('DUPLICATE_ATTENDANCE');
-        }
+      hasil = bersihkan({
+        id: docId,
+        sesiId: sesi.id,
+        namaSesi: String(dataSesi.nama ?? sesi.nama),
+        kelas: String(dataSesi.kelas ?? sesi.kelas),
+        praktikanId: uid,
+        namaPraktikan: praktikan.nama,
+        nimPraktikan: praktikan.nim ?? '',
+        tanggal: formatTanggalPresensi(now),
+        waktuKehadiran: formatJamPresensi(now),
+        createdAtIso: now.toISOString(),
+        status: 'HADIR' as const,
+        labId,
+        lokasi: infoLokasi,
+        jarakMeter: infoLokasi?.jarakMeter,
+        terlambat,
+        menitTerlambat: terlambat ? Math.max(0, selisihMenit - grace) : 0,
+      }) as CatatanPresensi;
 
-        tx.set(presensiRef, {
-          ...record,
-          createdAt: serverTimestamp(),
-        });
-      });
-    }
+      tx.set(presensiRef, { ...hasil, createdAt: serverTimestamp() });
+    });
 
-    return catatPresensi(record, sesi.status);
+    presensiStore.unshift(hasil);
+    emitPresensi();
+    return { ok: true, data: hasil };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '';
-    if (msg === 'UNAUTHENTICATED') {
-      return { ok: false, error: 'Presensi ditolak karena pengguna belum terautentikasi.' };
+    if (err instanceof GalatPresensi) return { ok: false, error: err.message };
+    const code = typeof err === 'object' && err && 'code' in err ? String((err as { code: unknown }).code) : '';
+    if (code.includes('permission-denied')) {
+      return { ok: false, error: 'Presensi ditolak server: sesi tidak dibuka, lokasi di luar radius, atau kamu sudah presensi.' };
     }
-    if (msg === 'SESSION_NOT_FOUND') {
-      return { ok: false, error: 'Sesi praktikum tidak ditemukan di server.' };
-    }
-    if (msg === 'SESSION_NOT_OPEN') {
-      return { ok: false, error: 'Presensi ditolak karena sesi di server tidak sedang dibuka.' };
-    }
-    if (msg === 'DUPLICATE_ATTENDANCE') {
-      return { ok: false, error: 'Kamu sudah melakukan presensi pada sesi ini.' };
+    if (code.includes('unavailable') || code.includes('deadline-exceeded')) {
+      return { ok: false, error: 'Tidak dapat terhubung ke server. Periksa koneksi internet lalu coba lagi.' };
     }
     return { ok: false, error: 'Gagal menyimpan presensi ke server. Silakan coba lagi.' };
   } finally {
@@ -372,7 +330,8 @@ export function useRiwayatPraktikan(praktikanId: string): CatatanPresensi[] {
   return list.filter((p) => p.praktikanId === praktikanId);
 }
 
-export function resetPresensiDemo() {
-  presensiStore.splice(0, presensiStore.length, ...SEED_PRESENSI);
+/** Mengosongkan cache lokal (dipanggil saat logout agar data pengguna lain tidak tersisa). */
+export function bersihkanPresensiLokal() {
+  presensiStore.splice(0, presensiStore.length);
   emitPresensi();
 }

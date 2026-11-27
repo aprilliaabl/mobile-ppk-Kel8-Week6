@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import type { PengajuanIzin } from '../constants/types';
-import { useCurrentUser } from '../constants/dummy';
+import { useCurrentUser } from '../hooks/use-current-user';
 import { prosesKeputusanIzin } from '../constants/izinStore';
 import { inisial } from '../constants/format';
 import { W, warnaAvatar } from '../constants/warna';

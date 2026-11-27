@@ -13,9 +13,6 @@ export interface UseLokasiPresensiReturn {
   canAskAgain: boolean;
   segarkanLokasi: () => Promise<void>;
   bukaPengaturanIzin: () => Promise<void>;
-  /** Mode simulasi GPS khusus pengujian di emulator/perangkat saat demonstrasi */
-  setKoordinatSimulasi: (koord: KoordinatPerangkat | null) => void;
-  isSimulasi: boolean;
 }
 
 /**
@@ -26,8 +23,6 @@ export function useLokasiPresensi(): UseLokasiPresensiReturn {
   const [statusLokasi, setStatusLokasi] =
     useState<StatusLokasiPerangkat>('memuat');
   const [koordinatAsli, setKoordinatAsli] =
-    useState<KoordinatPerangkat | null>(null);
-  const [koordinatSimulasi, setKoordinatSimulasiState] =
     useState<KoordinatPerangkat | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [canAskAgain, setCanAskAgain] = useState<boolean>(true);
@@ -112,17 +107,6 @@ export function useLokasiPresensi(): UseLokasiPresensiReturn {
     };
   }, [ambilLokasi]);
 
-  const setKoordinatSimulasi = useCallback(
-    (koord: KoordinatPerangkat | null) => {
-      setKoordinatSimulasiState(koord);
-      if (koord) {
-        setStatusLokasi('berhasil');
-        setErrorDetail(null);
-      }
-    },
-    []
-  );
-
   const bukaPengaturanIzin = useCallback(async () => {
     try {
       await Linking.openSettings();
@@ -131,19 +115,13 @@ export function useLokasiPresensi(): UseLokasiPresensiReturn {
     }
   }, []);
 
-  const koordinat = koordinatSimulasi ?? koordinatAsli;
-  const effectiveStatus: StatusLokasiPerangkat = koordinatSimulasi
-    ? 'berhasil'
-    : statusLokasi;
 
   return {
-    statusLokasi: effectiveStatus,
-    koordinat,
+    statusLokasi,
+    koordinat: koordinatAsli,
     errorDetail,
     canAskAgain,
     segarkanLokasi: ambilLokasi,
     bukaPengaturanIzin,
-    setKoordinatSimulasi,
-    isSimulasi: koordinatSimulasi !== null,
   };
 }

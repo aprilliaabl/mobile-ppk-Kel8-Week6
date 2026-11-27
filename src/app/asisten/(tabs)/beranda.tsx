@@ -5,7 +5,8 @@ import { HeaderCard, StatBox } from '../../../components/HeaderCard';
 import { Button } from '../../../components/Button';
 import { FormSesi } from '../../../components/FormSesi';
 import { JadwalLaboratoriumSection } from '../../../components/JadwalLaboratoriumSection';
-import { tambahSesi, useCurrentUser, useSesiList } from '../../../constants/dummy';
+import { tambahSesi, useSesiList } from '../../../constants/sesiStore';
+import { useCurrentUser } from '../../../hooks/use-current-user';
 import { W } from '../../../constants/warna';
 
 export default function BerandaAsisten() {

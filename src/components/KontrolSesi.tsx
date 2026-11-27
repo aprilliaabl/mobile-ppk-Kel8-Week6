@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
-import { bukaSesi, tutupSesi, useRekapSesi } from "../constants/dummy";
+import { bukaSesi, tutupSesi, useRekapSesi } from "../constants/sesiStore";
 import { Sesi } from "../constants/types";
 import { W } from "../constants/warna";
 import { BottomSheet } from "./BottomSheet";

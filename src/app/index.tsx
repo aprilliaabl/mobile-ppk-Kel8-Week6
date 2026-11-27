@@ -1,105 +1,106 @@
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Button } from '../components/Button';
 import { Ikon } from '../components/Ikon';
-import { resetDemo, userDummy } from '../constants/dummy';
+import { LoadingState } from '../components/StateView';
 import { inisial } from '../constants/format';
 import { W, warnaAvatar } from '../constants/warna';
+import { useAuth, type UserRole } from '../contexts/AuthContext';
 
-export default function PilihRole() {
+const DESKRIPSI: Record<UserRole, { judul: string; teks: string; warna: string }> = {
+  asisten: {
+    judul: 'Asisten',
+    teks: 'Kelola laboratorium, anggota, sesi praktikum, dan pantau rekap kehadiran serta izin.',
+    warna: W.blue,
+  },
+  praktikan: {
+    judul: 'Praktikan',
+    teks: 'Lihat jadwal, presensi di lokasi laboratorium, ajukan izin, dan cek riwayat kehadiran.',
+    warna: W.green,
+  },
+};
+
+/** Pintu masuk aplikasi: login/daftar, pemilihan peran (bila punya dua), atau langsung ke beranda sesuai peran. */
+export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const lebar = width >= 760;
+  const { currentUser, loading, activeRole, setActiveRole, logout } = useAuth();
 
-  const asisten = userDummy.find((u) => u.role === 'asisten')!;
-  const praktikan = userDummy.find((u) => u.role === 'praktikan')!;
+  if (loading) {
+    return (
+      <View style={styles.tengah}>
+        <LoadingState teks="Menyiapkan aplikasi..." />
+      </View>
+    );
+  }
+
+  if (currentUser && activeRole) {
+    return <Redirect href={(activeRole === 'asisten' ? '/asisten/dashboard' : '/praktikan/beranda') as never} />;
+  }
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: W.bg }}
-      contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 36, paddingBottom: insets.bottom + 28 }]}
+      contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 28 }]}
     >
       <View style={styles.inner}>
-        <View style={styles.logo}><Ikon nama="centang" size={36} color="#FFFFFF" /></View>
+        <View style={styles.logo}>
+          <Ikon nama="centang" size={36} color="#FFFFFF" />
+        </View>
         <Text style={styles.title}>Presensi Praktikum</Text>
-        <Text style={styles.subtitle}>Sistem Presensi & Pengelolaan Sesi Praktikum</Text>
+        <Text style={styles.subtitle}>Presensi berbasis lokasi dan pengelolaan laboratorium Informatika</Text>
 
-        {/* Tombol Utama Akun Firebase */}
-        <View style={styles.authBanner}>
-          <Text style={styles.authTitle}>Punya Akun Praktikum?</Text>
-          <Text style={styles.authSubtitle}>Masuk atau daftar dengan akun Firebase untuk presensi real-time</Text>
-          <View style={{ gap: 10, marginTop: 6 }}>
-            <Button label="Masuk dengan Akun Firebase" onPress={() => router.push('/login' as never)} />
-            <Button label="Belum punya akun? Daftar Akun Baru" variant="outline" onPress={() => router.push('/register' as never)} />
+        {!currentUser ? (
+          <View style={styles.kartu}>
+            <Text style={styles.kartuJudul}>Mulai</Text>
+            <Text style={styles.desc}>Masuk dengan akunmu, atau daftar bila belum punya. Satu akun bisa menjadi praktikan sekaligus asisten.</Text>
+            <Button label="Masuk" onPress={() => router.push('/login' as never)} />
+            <Button label="Daftar Akun Baru" variant="outline" onPress={() => router.push('/register' as never)} />
           </View>
-        </View>
-
-        <View style={{ marginVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: W.line }} />
-          <Text style={{ color: W.sub, fontSize: 12, fontWeight: '700' }}>ATAU GUNAKAN MODE DEMO CEPAT</Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: W.line }} />
-        </View>
-
-        <View style={[styles.cards, lebar && styles.cardsRow]}>
-          {/* Kartu Asisten */}
-          <View style={[styles.kartu, lebar && { flex: 1 }]}>
-            <View style={styles.kartuHead}>
-              <View style={[styles.avatar, { backgroundColor: warnaAvatar(asisten.id) }]}>
-                <Text style={styles.avatarText}>{inisial(asisten.nama)}</Text>
+        ) : (
+          <View style={{ gap: 14 }}>
+            <View style={styles.salam}>
+              <View style={[styles.avatar, { backgroundColor: warnaAvatar(currentUser.uid) }]}>
+                <Text style={styles.avatarText}>{inisial(currentUser.nama)}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.nama}>{asisten.nama}</Text>
-                <View style={styles.pill}><Text style={styles.pillText}>ASISTEN</Text></View>
+                <Text style={styles.nama}>Halo, {currentUser.nama}</Text>
+                <Text style={styles.desc}>Kamu terdaftar sebagai asisten dan praktikan. Pilih peran untuk sesi ini.</Text>
               </View>
             </View>
-            <Text style={styles.desc}>Lihat jadwal, buka dan tutup sesi lewat Dashboard, serta pantau rekap kehadiran praktikan.</Text>
-            <Button label="Masuk sebagai Asisten" onPress={() => router.replace('/asisten/beranda')} />
-
+            {currentUser.roles.map((r) => (
+              <Pressable
+                key={r}
+                onPress={() => setActiveRole(r)}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.kartu, { borderColor: DESKRIPSI[r].warna }, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={[styles.kartuJudul, { color: DESKRIPSI[r].warna }]}>Masuk sebagai {DESKRIPSI[r].judul}</Text>
+                <Text style={styles.desc}>{DESKRIPSI[r].teks}</Text>
+              </Pressable>
+            ))}
+            <Button label="Keluar dari akun" variant="ghost" onPress={() => void logout()} />
           </View>
-
-          {/* Kartu Praktikan */}
-          <View style={[styles.kartu, lebar && { flex: 1 }]}>
-            <View style={styles.kartuHead}>
-              <View style={[styles.avatar, { backgroundColor: warnaAvatar(praktikan.id) }]}>
-                <Text style={styles.avatarText}>{inisial(praktikan.nama)}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.nama}>{praktikan.nama}</Text>
-                <View style={[styles.pill, { backgroundColor: W.greenSoft }]}>
-                  <Text style={[styles.pillText, { color: W.green }]}>PRAKTIKAN</Text>
-                </View>
-              </View>
-            </View>
-            <Text style={styles.desc}>Lihat jadwal, lakukan presensi saat sesi dibuka, dan cek riwayat kehadiran.</Text>
-            <Button label="Masuk sebagai Praktikan" variant="success" onPress={() => router.replace('/praktikan/beranda')} />
-          </View>
-        </View>
-
-        <Button label="Reset data demo" variant="ghost" onPress={resetDemo} />
+        )}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  tengah: { flex: 1, backgroundColor: W.bg, justifyContent: 'center' },
   scroll: { flexGrow: 1, paddingHorizontal: 20 },
-  inner: { width: '100%', maxWidth: 860, alignSelf: 'center', gap: 6 },
+  inner: { width: '100%', maxWidth: 520, alignSelf: 'center', gap: 8 },
   logo: { width: 76, height: 76, borderRadius: 24, backgroundColor: W.blue, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 14 },
   title: { fontSize: 28, fontWeight: '800', color: W.text, textAlign: 'center' },
-  subtitle: { fontSize: 14, color: W.sub, textAlign: 'center', marginBottom: 26 },
-  authBanner: { backgroundColor: W.card, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: W.blue, gap: 6, marginBottom: 8 },
-  authTitle: { fontSize: 16, fontWeight: '800', color: W.text },
-  authSubtitle: { fontSize: 13, color: W.sub, lineHeight: 18, marginBottom: 4 },
-  cards: { gap: 14, marginBottom: 8 },
-  cardsRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  kartu: { backgroundColor: W.card, borderRadius: 24, padding: 20, gap: 14, borderWidth: 1, borderColor: W.line },
-  kartuHead: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
-  nama: { fontSize: 20, fontWeight: '800', color: W.text },
-  pill: { alignSelf: 'flex-start', backgroundColor: W.blueSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 4 },
-  pillText: { color: W.blue, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  subtitle: { fontSize: 14, color: W.sub, textAlign: 'center', marginBottom: 22, lineHeight: 20 },
+  kartu: { backgroundColor: W.card, borderRadius: 22, padding: 20, gap: 12, borderWidth: 1, borderColor: W.line },
+  kartuJudul: { fontSize: 18, fontWeight: '800', color: W.text },
   desc: { fontSize: 14, color: W.sub, lineHeight: 20 },
+  salam: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: W.card, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: W.line },
+  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  nama: { fontSize: 17, fontWeight: '800', color: W.text, marginBottom: 2 },
 });

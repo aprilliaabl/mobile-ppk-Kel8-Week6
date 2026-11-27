@@ -8,11 +8,11 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
+import { auth, COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
 import { klasifikasikanAlasanIzin } from '../ai/absenceClassifier';
 import type { SentimentResult } from '../ai/sentiment';
 import { cekSudahPresensi, formatJamPresensi, formatTanggalPresensi } from './presensiStore';
-import type { KlasifikasiAI, PengajuanIzin, Role, Sesi, UserDummy } from './types';
+import type { KlasifikasiAI, PengajuanIzin, Role, Sesi, Pengguna } from './types';
 
 export interface HasilSubmitIzin {
   ok: boolean;
@@ -24,29 +24,7 @@ export function buatIdIzin(sesiId: string, praktikanId: string): string {
   return `${sesiId.trim()}_${praktikanId.trim()}`;
 }
 
-function buatSeedIzin(): PengajuanIzin[] {
-  const alasanContoh =
-    'Mohon maaf kak, saya izin tidak dapat hadir mengikuti praktikum Basis Data hari ini karena sedang sakit demam tinggi dan harus istirahat berdasarkan surat keterangan dokter.';
-  return [
-    {
-      id: 's-2_u-3',
-      sesiId: 's-2',
-      namaSesi: 'Praktikum Basis Data',
-      kelas: 'IF-2B',
-      praktikanId: 'u-3',
-      namaPraktikan: 'Budi Santoso',
-      nimPraktikan: '22/007',
-      alasan: alasanContoh,
-      status: 'pending',
-      klasifikasiAI: klasifikasikanAlasanIzin(alasanContoh),
-      tanggalPengajuan: formatTanggalPresensi(new Date()),
-      waktuPengajuan: '10.15.00',
-      createdAtIso: new Date().toISOString(),
-    },
-  ];
-}
-
-export const izinStore: PengajuanIzin[] = buatSeedIzin();
+export const izinStore: PengajuanIzin[] = [];
 let izinSnapshot: PengajuanIzin[] = [...izinStore];
 const listeners = new Set<() => void>();
 const inFlightIzin = new Set<string>();
@@ -81,7 +59,7 @@ export function cekIzinSesi(sesiId: string, praktikanId: string): PengajuanIzin 
  */
 export async function ajukanIzin(params: {
   sesi: Sesi | undefined;
-  praktikan: UserDummy | undefined;
+  praktikan: Pengguna | undefined;
   alasan: string;
   customClassifier?: (text: string) => SentimentResult;
 }): Promise<HasilSubmitIzin> {
@@ -104,6 +82,10 @@ export async function ajukanIzin(params: {
       ok: false,
       error: 'Kamu sudah tercatat hadir pada sesi ini sehingga tidak dapat mengajukan izin.',
     };
+  }
+
+  if (!isFirebaseConfigured || !db || !auth?.currentUser || auth.currentUser.uid !== praktikan.id) {
+    return { ok: false, error: 'Sesi login tidak ditemukan. Silakan login kembali.' };
   }
 
   const docId = buatIdIzin(sesi.id, praktikan.id);
@@ -142,7 +124,7 @@ export async function ajukanIzin(params: {
       kelas: sesi.kelas,
       praktikanId: praktikan.id,
       namaPraktikan: praktikan.nama,
-      nimPraktikan: praktikan.nim ?? '22/001',
+      nimPraktikan: praktikan.nim ?? '',
       alasan: alasanBersih,
       // FR-12: AI tidak pernah menyetujui/menolak otomatis; status selalu 'pending' saat diajukan
       status: 'pending',
@@ -152,20 +134,18 @@ export async function ajukanIzin(params: {
       createdAtIso: now.toISOString(),
     };
 
-    if (isFirebaseConfigured && db) {
-      const firestoreDb = db;
-      await runTransaction(firestoreDb, async (tx) => {
-        const izinRef = doc(firestoreDb, COLLECTIONS.IZIN, docId);
-        const existingSnap = await tx.get(izinRef);
-        if (existingSnap.exists()) {
-          throw new Error('DUPLICATE_IZIN');
-        }
-        tx.set(izinRef, {
-          ...record,
-          createdAt: serverTimestamp(),
-        });
+    const firestoreDb = db;
+    await runTransaction(firestoreDb, async (tx) => {
+      const izinRef = doc(firestoreDb, COLLECTIONS.IZIN, docId);
+      const existingSnap = await tx.get(izinRef);
+      if (existingSnap.exists()) {
+        throw new Error('DUPLICATE_IZIN');
+      }
+      tx.set(izinRef, {
+        ...JSON.parse(JSON.stringify(record)),
+        createdAt: serverTimestamp(),
       });
-    }
+    });
 
     izinStore.unshift(record);
     emitIzin();
@@ -189,7 +169,7 @@ export async function ajukanIzin(params: {
 export async function prosesKeputusanIzin(params: {
   izinId: string;
   keputusan: 'disetujui' | 'ditolak';
-  asisten: UserDummy | undefined;
+  asisten: Pengguna | undefined;
 }): Promise<HasilSubmitIzin> {
   const { izinId, keputusan, asisten } = params;
 
@@ -201,6 +181,10 @@ export async function prosesKeputusanIzin(params: {
   }
   if (!izinId?.trim()) {
     return { ok: false, error: 'ID pengajuan izin tidak valid.' };
+  }
+
+  if (!isFirebaseConfigured || !db) {
+    return { ok: false, error: 'Firebase belum dikonfigurasi. Periksa file .env.' };
   }
 
   const idx = izinStore.findIndex((item) => item.id === izinId);
@@ -225,33 +209,20 @@ export async function prosesKeputusanIzin(params: {
     const diprosesPada = new Date().toISOString();
     const diprosesOleh = asisten.nama;
 
-    if (isFirebaseConfigured && db) {
-      const firestoreDb = db;
-      await runTransaction(firestoreDb, async (tx) => {
-        const izinRef = doc(firestoreDb, COLLECTIONS.IZIN, izinId);
-        const snap = await tx.get(izinRef);
-        if (snap.exists()) {
-          const currentStatus = snap.data()?.status;
-          if (currentStatus !== 'pending') {
-            throw new Error('ALREADY_PROCESSED');
-          }
-          tx.update(izinRef, {
-            status: keputusan,
-            diprosesOleh,
-            diprosesPada,
-            updatedAt: serverTimestamp(),
-          });
-        } else {
-          tx.set(izinRef, {
-            ...target,
-            status: keputusan,
-            diprosesOleh,
-            diprosesPada,
-            updatedAt: serverTimestamp(),
-          });
-        }
+    const firestoreDb = db;
+    await runTransaction(firestoreDb, async (tx) => {
+      const izinRef = doc(firestoreDb, COLLECTIONS.IZIN, izinId);
+      const snap = await tx.get(izinRef);
+      if (!snap.exists()) throw new Error('NOT_FOUND');
+      if (snap.data()?.status !== 'pending') throw new Error('ALREADY_PROCESSED');
+      tx.update(izinRef, {
+        status: keputusan,
+        diprosesOleh,
+        diprosesPada,
+        diprosesOlehId: asisten.id,
+        updatedAt: serverTimestamp(),
       });
-    }
+    });
 
     const updated: PengajuanIzin = {
       ...target,
@@ -270,6 +241,7 @@ export async function prosesKeputusanIzin(params: {
         error: 'Pengajuan izin ini sudah diproses sebelumnya dan tidak dapat diubah lagi.',
       };
     }
+    if (msg === 'NOT_FOUND') return { ok: false, error: 'Data pengajuan izin tidak ditemukan di server.' };
     return { ok: false, error: 'Gagal menyimpan keputusan izin ke server.' };
   } finally {
     inFlightIzin.delete(izinId);
@@ -440,7 +412,8 @@ export function useRiwayatIzinPraktikan(praktikanId: string): PengajuanIzin[] {
   }, [list, praktikanId]);
 }
 
-export function resetIzinDemo() {
-  izinStore.splice(0, izinStore.length, ...buatSeedIzin());
+/** Mengosongkan cache lokal (dipanggil saat logout). */
+export function bersihkanIzinLokal() {
+  izinStore.splice(0, izinStore.length);
   emitIzin();
 }

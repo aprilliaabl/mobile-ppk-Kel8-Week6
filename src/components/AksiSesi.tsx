@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Sesi } from '../constants/types';
-import { hapusSesi, ubahSesi } from '../constants/dummy';
+import { hapusSesi, ubahSesi } from '../constants/sesiStore';
 import { Button } from './Button';
 import { FormSesi } from './FormSesi';
 import { ConfirmModal } from './ConfirmModal';

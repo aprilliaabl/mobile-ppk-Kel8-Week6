@@ -1,19 +1,20 @@
-
 import { PermissionsAndroid, Platform } from 'react-native';
 
 import {
-    getMessaging,
-    getToken,
-    onMessage,
-    onTokenRefresh,
-    setBackgroundMessageHandler,
-    type RemoteMessage,
+  deleteToken,
+  getMessaging,
+  getToken,
+  onMessage,
+  onTokenRefresh,
+  setBackgroundMessageHandler,
+  type RemoteMessage,
 } from '@react-native-firebase/messaging';
 
 import {
-    doc,
-    serverTimestamp,
-    setDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
 
 import * as Notifications from 'expo-notifications';
@@ -30,8 +31,17 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Instance Firebase Messaging native.
-const messaging = getMessaging();
+/**
+ * Firebase Messaging hanya digunakan pada Android/iOS.
+ * Pada web, jangan memanggil getMessaging().
+ */
+function getNativeMessaging() {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+
+  return getMessaging();
+}
 
 /**
  * Menampilkan notifikasi lokal ketika pesan FCM diterima
@@ -64,6 +74,10 @@ async function showLocalNotification(message: RemoteMessage) {
  * Meminta izin notifikasi sesuai platform.
  */
 async function requestNotificationPermission(): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    return false;
+  }
+
   if (Platform.OS === 'android') {
     if (Number(Platform.Version) >= 33) {
       const result = await PermissionsAndroid.request(
@@ -77,6 +91,12 @@ async function requestNotificationPermission(): Promise<boolean> {
   }
 
   if (Platform.OS === 'ios') {
+    const messaging = getNativeMessaging();
+
+    if (!messaging) {
+      return false;
+    }
+
     const status = await messaging.requestPermission();
 
     return status === 1 || status === 2;
@@ -119,6 +139,25 @@ export async function registerFCMToken(
   permissionGranted: boolean;
   unsubscribeToken: () => void;
 }> {
+  // FCM native tidak dijalankan di web.
+  if (Platform.OS === 'web') {
+    console.log('[FCM] FCM tidak dijalankan pada web.');
+
+    return {
+      permissionGranted: false,
+      unsubscribeToken: () => {},
+    };
+  }
+
+  const messaging = getNativeMessaging();
+
+  if (!messaging) {
+    return {
+      permissionGranted: false,
+      unsubscribeToken: () => {},
+    };
+  }
+
   const permissionGranted = await requestNotificationPermission();
 
   if (!permissionGranted) {
@@ -161,11 +200,54 @@ export async function registerFCMToken(
 }
 
 /**
+ * Menghapus token perangkat ini dari profil pengguna saat logout (FR-22),
+ * lalu mencabut token di FCM agar perangkat tidak menerima notifikasi akun lama.
+ */
+export async function hapusTokenFCM(uid: string): Promise<void> {
+  if (Platform.OS === 'web' || !db) return;
+  const messaging = getNativeMessaging();
+  if (!messaging) return;
+
+  const token = await getToken(messaging);
+  await deleteDoc(doc(db, COLLECTIONS.USERS, uid, 'fcmTokens', token));
+  await deleteToken(messaging);
+}
+
+/**
+ * Status izin notifikasi untuk banner kondisi perangkat (FR-23).
+ * true = diizinkan, false = ditolak/dimatikan.
+ */
+export async function izinNotifikasiAktif(): Promise<boolean> {
+  if (Platform.OS === 'web') return true;
+  try {
+    const status = await Notifications.getPermissionsAsync();
+    return status.granted;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Listener pesan ketika aplikasi sedang foreground.
  */
 export function listenForegroundMessages() {
+  // Web tidak menggunakan Firebase Messaging native.
+  if (Platform.OS === 'web') {
+    return () => {};
+  }
+
+  const messaging = getNativeMessaging();
+
+  if (!messaging) {
+    return () => {};
+  }
+
   return onMessage(messaging, async (message) => {
-    console.log('[FCM] Pesan foreground diterima:', message.messageId);
+    console.log(
+      '[FCM] Pesan foreground diterima:',
+      message.messageId
+    );
+
     await showLocalNotification(message);
   });
 }
@@ -173,7 +255,18 @@ export function listenForegroundMessages() {
 /**
  * Handler pesan ketika aplikasi berjalan di background.
  * Harus didaftarkan pada scope modul, bukan di dalam komponen.
+ *
+ * Hanya didaftarkan pada Android/iOS.
  */
-setBackgroundMessageHandler(messaging, async (message) => {
-  console.log('[FCM] Pesan background diterima:', message.messageId);
-});
+if (Platform.OS !== 'web') {
+  const messaging = getNativeMessaging();
+
+  if (messaging) {
+    setBackgroundMessageHandler(messaging, async (message) => {
+      console.log(
+        '[FCM] Pesan background diterima:',
+        message.messageId
+      );
+    });
+  }
+}

@@ -1,141 +1,15 @@
-import { collection, onSnapshot } from 'firebase/firestore';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
+import { useEffect, useMemo, useState } from 'react';
+import { useLaboratoriumList } from './laboratoriumStore';
 import type { Laboratorium, Sesi } from './types';
 
-/**
- * Daftar master laboratorium default beserta koordinat GPS dan radius presensi (meter).
- * Dapat di-override oleh dokumen pada koleksi Firestore `laboratorium` apabila tersedia.
- */
-export const DEFAULT_LABORATORIUM: Laboratorium[] = [
-  {
-    id: 'lab-komputer-1',
-    kode: 'LAB-KOMPUTER-1',
-    nama: 'Lab Komputer 1',
-    gedung: 'Gedung Laboratorium Terpadu Lt. 1',
-    latitude: -7.76542,
-    longitude: 110.37258,
-    radius: 100,
-  },
-  {
-    id: 'lab-komputer-2',
-    kode: 'LAB-KOMPUTER-2',
-    nama: 'Lab Komputer 2',
-    gedung: 'Gedung Laboratorium Terpadu Lt. 2',
-    latitude: -7.76548,
-    longitude: 110.37264,
-    radius: 100,
-  },
-  {
-    id: 'lab-komputer-3',
-    kode: 'LAB-KOMPUTER-3',
-    nama: 'Lab Komputer 3',
-    gedung: 'Gedung Laboratorium Terpadu Lt. 3',
-    latitude: -7.76554,
-    longitude: 110.37270,
-    radius: 100,
-  },
-  {
-    id: 'lab-jaringan',
-    kode: 'LAB-JARINGAN',
-    nama: 'Lab Jaringan',
-    gedung: 'Gedung Laboratorium Terpadu Lt. 2',
-    latitude: -7.76560,
-    longitude: 110.37275,
-    radius: 100,
-  },
-];
-
-let labState: Laboratorium[] = [...DEFAULT_LABORATORIUM];
-const labListeners = new Set<() => void>();
-let unsubscribeLabFS: (() => void) | null = null;
-
-function emitLab() {
-  labState = [...labState];
-  labListeners.forEach((l) => l());
-}
-
-function mulaiListenerLab() {
-  if (!isFirebaseConfigured || !db || unsubscribeLabFS) return;
-  try {
-    unsubscribeLabFS = onSnapshot(
-      collection(db, COLLECTIONS.LABORATORIUM),
-      (snap) => {
-        if (snap.empty) return;
-        const dariServer: Laboratorium[] = [];
-        snap.forEach((docSnap) => {
-          const d = docSnap.data();
-          if (
-            typeof d.nama === 'string' &&
-            typeof d.latitude === 'number' &&
-            typeof d.longitude === 'number'
-          ) {
-            dariServer.push({
-              id: docSnap.id,
-              nama: d.nama,
-              gedung: typeof d.gedung === 'string' ? d.gedung : 'Laboratorium Praktikum',
-              kode: typeof d.kode === 'string' ? d.kode : docSnap.id,
-              latitude: d.latitude,
-              longitude: d.longitude,
-              radius:
-                typeof d.radius === 'number' && d.radius > 0
-                  ? d.radius
-                  : 100,
-              gracePeriodMinutes:
-                typeof d.gracePeriodMinutes === 'number' && d.gracePeriodMinutes >= 0
-                  ? d.gracePeriodMinutes
-                  : 15,
-            });
-          }
-        });
-        if (dariServer.length > 0) {
-          // Gabungkan data server dengan default (server meng-override ID/nama yang sama)
-          const map = new Map<string, Laboratorium>();
-          DEFAULT_LABORATORIUM.forEach((l) => map.set(l.id, l));
-          dariServer.forEach((l) => map.set(l.id, l));
-          labState = Array.from(map.values());
-          emitLab();
-        }
-      },
-      (err) => {
-        console.warn('[Firestore] Listener laboratorium fallback ke default:', err);
-      }
-    );
-  } catch {
-    // Gunakan DEFAULT_LABORATORIUM jika koneksi gagal
-  }
-}
-
-export function subscribeLaboratorium(listener: () => void): () => void {
-  labListeners.add(listener);
-  if (labListeners.size === 1) mulaiListenerLab();
-  return () => {
-    labListeners.delete(listener);
-    if (labListeners.size === 0 && unsubscribeLabFS) {
-      unsubscribeLabFS();
-      unsubscribeLabFS = null;
-    }
-  };
-}
-
-export function getLaboratoriumSnapshot(): Laboratorium[] {
-  return labState;
-}
-
-export function useLaboratoriumList(): Laboratorium[] {
-  return useSyncExternalStore(
-    subscribeLaboratorium,
-    getLaboratoriumSnapshot,
-    getLaboratoriumSnapshot
-  );
-}
+export { useLaboratoriumList };
 
 /**
  * Mencari data Laboratorium berdasarkan sesi (melalui `sesi.laboratoriumId` atau pencocokan nama `sesi.ruang`).
  */
 export function cariLaboratoriumSesi(
   sesi: Pick<Sesi, 'ruang' | 'laboratoriumId'> | undefined,
-  daftarLab: Laboratorium[] = labState
+  daftarLab: Laboratorium[] = []
 ): Laboratorium | undefined {
   if (!sesi) return undefined;
   if (sesi.laboratoriumId) {
@@ -196,23 +70,8 @@ export function hitungJadwalPerLaboratorium(
 ): JadwalPerLaboratorium[] {
   const nowMs = waktuReferensi.getTime();
 
-  // Pastikan seluruh laboratorium master terdaftar, plus ruangan tambahan dari sesi jika belum ada di master
+  // Hanya laboratorium yang terdaftar di Firestore yang ditampilkan.
   const semuaLab: Laboratorium[] = [...daftarLab];
-  for (const s of daftarSesi) {
-    const cocok = cariLaboratoriumSesi(s, semuaLab);
-    if (!cocok && s.ruang.trim()) {
-      const idBaru = s.ruang.trim().toLowerCase().replace(/\s+/g, '-');
-      semuaLab.push({
-        id: idBaru,
-        kode: idBaru.toUpperCase(),
-        nama: s.ruang.trim(),
-        gedung: 'Laboratorium Praktikum',
-        latitude: DEFAULT_LABORATORIUM[0].latitude,
-        longitude: DEFAULT_LABORATORIUM[0].longitude,
-        radius: 100,
-      });
-    }
-  }
 
   return semuaLab.map((lab) => {
     const sesiLab = daftarSesi

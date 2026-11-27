@@ -1,403 +1,157 @@
-
-import { Link } from 'expo-router';
+import { Link, Redirect } from 'expo-router';
+import { createUserWithEmailAndPassword, deleteUser, signOut } from 'firebase/auth';
+import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import {
-  createUserWithEmailAndPassword,
-  deleteUser,
-  signOut,
-} from 'firebase/auth';
+import { AuthShell, FieldInput, KotakGalat, PilihanChip } from '../components/AuthShell';
+import { Button } from '../components/Button';
+import { auth, COLLECTIONS, db, isFirebaseConfigured } from '../config/firebase';
+import { pesanAuth } from '../constants/pesanAuth';
+import { W } from '../constants/warna';
+import { useAuth, type UserRole } from '../contexts/AuthContext';
 
-import {
-  doc,
-  serverTimestamp,
-  setDoc,
-} from 'firebase/firestore';
+type Errors = Partial<Record<'nama' | 'nim' | 'email' | 'password' | 'konfirmasi' | 'peran' | 'kode', string>>;
 
-import {
-  auth,
-  COLLECTIONS,
-  db,
-  isFirebaseConfigured,
-} from '../config/firebase';
-
-type Role = 'praktikan' | 'asisten';
+/** Kunci dokumen indeks NIM: seragam huruf kecil tanpa karakter yang tidak boleh ada di ID dokumen. */
+const kunciNim = (nim: string) => nim.trim().toLowerCase().replace(/\//g, '-');
 
 export default function Register() {
+  const { currentUser } = useAuth();
   const [nama, setNama] = useState('');
+  const [nim, setNim] = useState('');
+  const [kelas, setKelas] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<Role | null>(null);
+  const [konfirmasi, setKonfirmasi] = useState('');
+  const [peran, setPeran] = useState<UserRole[]>(['praktikan']);
+  const [kode, setKode] = useState('');
+  const [err, setErr] = useState<Errors>({});
+  const [galat, setGalat] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = async () => {
-    const namaBersih = nama.trim();
-    const emailBersih = email.trim().toLowerCase();
+  if (currentUser) return <Redirect href="/" />;
 
-    // Validasi input
-    if (!namaBersih || !emailBersih || !password || !role) {
-      Alert.alert('Peringatan', 'Semua kolom wajib diisi.');
-      return;
-    }
+  const togglePeran = (p: UserRole) =>
+    setPeran((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
 
-    if (!/\S+@\S+\.\S+/.test(emailBersih)) {
-      Alert.alert('Peringatan', 'Format email tidak valid.');
-      return;
-    }
+  const validasi = (): Errors => {
+    const e: Errors = {};
+    if (nama.trim().length < 3) e.nama = 'Nama minimal 3 karakter.';
+    if (!/^[\w./-]{5,24}$/.test(nim.trim())) e.nim = 'NIM tidak valid (5-24 karakter, tanpa spasi).';
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = 'Format email tidak valid.';
+    if (password.length < 6) e.password = 'Password minimal 6 karakter.';
+    if (konfirmasi !== password) e.konfirmasi = 'Konfirmasi password tidak sama.';
+    if (peran.length === 0) e.peran = 'Pilih minimal satu peran.';
+    if (peran.includes('asisten') && !kode.trim()) e.kode = 'Kode verifikasi asisten wajib diisi.';
+    return e;
+  };
 
-    if (password.length < 6) {
-      Alert.alert(
-        'Peringatan',
-        'Password minimal 6 karakter.'
-      );
-      return;
-    }
-
-    // Validasi konfigurasi Firebase
+  const daftar = async () => {
+    const e = validasi();
+    setErr(e);
+    setGalat(null);
+    if (Object.keys(e).length > 0) return;
     if (!isFirebaseConfigured || !auth || !db) {
-      Alert.alert(
-        'Konfigurasi Firebase',
-        'Firebase belum dikonfigurasi dengan benar. Periksa file .env.'
-      );
-      return;
+      return setGalat('Firebase belum dikonfigurasi. Periksa file .env.');
     }
 
-    let createdUser = null;
-
+    const firestore = db;
+    let dibuat: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>['user'] | null = null;
+    setLoading(true);
     try {
-      setLoading(true);
+      const cred = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+      dibuat = cred.user;
 
-      // Membuat akun menggunakan Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        emailBersih,
-        password
-      );
-
-      createdUser = userCredential.user;
-
-      const isAsistenRequest = role === 'asisten';
-
-      // Menyimpan profil pengguna ke Firestore
-      await setDoc(
-        doc(db, COLLECTIONS.USERS, createdUser.uid),
-        {
-          uid: createdUser.uid,
-          nama: namaBersih,
-          email: emailBersih,
-
-          // Hak akses awal selalu praktikan
-          role: 'praktikan',
-
-          // Role yang dipilih saat registrasi
-          requestedRole: role,
-
-          // Permohonan asisten membutuhkan persetujuan
-          accountStatus: isAsistenRequest ? 'pending' : 'active',
-
-          createdAt: serverTimestamp(),
+      // Profil dan indeks NIM ditulis atomik. Indeks NIM bersifat create-only, sehingga NIM ganda ditolak server.
+      const batch = writeBatch(firestore);
+      batch.set(doc(firestore, COLLECTIONS.NIM_INDEX, kunciNim(nim)), {
+        uid: cred.user.uid,
+        nim: nim.trim(),
+        createdAt: serverTimestamp(),
+      });
+      batch.set(doc(firestore, COLLECTIONS.USERS, cred.user.uid), {
+        uid: cred.user.uid,
+        nama: nama.trim(),
+        nim: nim.trim(),
+        email: email.trim().toLowerCase(),
+        ...(kelas.trim() ? { kelas: kelas.trim().toUpperCase() } : {}),
+        roles: peran,
+        accountStatus: 'active',
+        ...(peran.includes('asisten') ? { kodeAsisten: kode.trim() } : {}),
+        createdAt: serverTimestamp(),
+      });
+      await batch.commit();
+      // Setelah profil tersimpan, AuthContext memuat akun dan Redirect di atas membawa pengguna masuk.
+    } catch (error) {
+      console.error('Registration error:', error);
+      if (dibuat) {
+        try {
+          await deleteUser(dibuat);
+        } catch {
+          await signOut(auth).catch(() => {});
         }
-      );
-
-      // Penanganan berdasarkan role yang dipilih
-      if (isAsistenRequest) {
-        // Akun asisten menunggu persetujuan administrator
-        await signOut(auth);
-
-        Alert.alert(
-          'Registrasi Berhasil',
-          `Akun Asisten untuk ${namaBersih} berhasil didaftarkan! Silakan login untuk mengelola sesi.`
+      }
+      const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
+      if (code.includes('permission-denied')) {
+        setGalat(
+          peran.includes('asisten')
+            ? 'Pendaftaran ditolak. Periksa kode verifikasi asisten, dan pastikan NIM belum pernah didaftarkan.'
+            : 'Pendaftaran ditolak. NIM ini kemungkinan sudah pernah didaftarkan.'
         );
       } else {
-        Alert.alert(
-          'Registrasi Berhasil',
-          `Selamat datang, ${namaBersih}! Akun Praktikan kamu berhasil dibuat. Silakan login.`
-        );
+        setGalat(pesanAuth(error));
       }
-
-      // Mengosongkan form setelah berhasil
-      setNama('');
-      setEmail('');
-      setPassword('');
-      setRole(null);
-
-    } catch (error: unknown) {
-      console.error('Registration error:', error);
-
-      // Menghapus akun Auth jika penyimpanan profil gagal
-      if (createdUser) {
-        try {
-          await deleteUser(createdUser);
-        } catch (rollbackError) {
-          console.error(
-            'Gagal membersihkan akun setelah registrasi:',
-            rollbackError
-          );
-
-          try {
-            await signOut(auth);
-          } catch (signOutError) {
-            console.error('Gagal sign out:', signOutError);
-          }
-        }
-      }
-
-      // Mengidentifikasi kode error Firebase
-      const errorCode =
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error
-          ? String(error.code)
-          : '';
-
-      let pesan = 'Terjadi kesalahan. Silakan coba kembali.';
-
-      switch (errorCode) {
-        case 'auth/email-already-in-use':
-          pesan = 'Email sudah terdaftar. Silakan gunakan email lain.';
-          break;
-
-        case 'auth/invalid-email':
-          pesan = 'Format email tidak valid.';
-          break;
-
-        case 'auth/weak-password':
-          pesan = 'Password terlalu lemah. Gunakan minimal 6 karakter.';
-          break;
-
-        case 'auth/operation-not-allowed':
-          pesan = 'Registrasi email/password belum diaktifkan di Firebase.';
-          break;
-
-        case 'auth/network-request-failed':
-          pesan = 'Koneksi internet bermasalah. Periksa jaringan kamu.';
-          break;
-
-        case 'permission-denied':
-        case 'firestore/permission-denied':
-          pesan = 'Profil gagal disimpan karena izin Firestore. Periksa Security Rules.';
-          break;
-      }
-
-      Alert.alert('Registrasi Gagal', pesan);
-
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Buat Akun</Text>
+    <AuthShell judul="Buat Akun" subjudul="Satu akun untuk semua praktikum kamu">
+      {!!galat && <KotakGalat pesan={galat} />}
+      <FieldInput label="Nama Lengkap" value={nama} onChangeText={setNama} placeholder="Nama sesuai KRS" autoCapitalize="words" error={err.nama} editable={!loading} />
+      <FieldInput label="NIM" value={nim} onChangeText={setNim} placeholder="24060123140001" error={err.nim} editable={!loading} hint="NIM dipakai aslab untuk memasukkanmu ke laboratorium." />
+      <FieldInput label="Email" value={email} onChangeText={setEmail} placeholder="nama@students.undip.ac.id" keyboardType="email-address" error={err.email} editable={!loading} />
+      <FieldInput label="Password" value={password} onChangeText={setPassword} placeholder="Minimal 6 karakter" secure error={err.password} editable={!loading} />
+      <FieldInput label="Ulangi Password" value={konfirmasi} onChangeText={setKonfirmasi} placeholder="Ketik ulang password" secure error={err.konfirmasi} editable={!loading} />
 
-      <Text style={styles.subtitle}>
-        Daftarkan akun untuk menggunakan Presensi Praktikum
-      </Text>
-
-      {/* Input nama */}
-      <Text style={styles.label}>Nama Lengkap</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Masukkan nama lengkap"
-        value={nama}
-        onChangeText={setNama}
-        autoCapitalize="words"
-        editable={!loading}
-      />
-
-      {/* Input email */}
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Masukkan email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!loading}
-      />
-
-      {/* Input password */}
-      <Text style={styles.label}>Password</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Minimal 6 karakter"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!loading}
-      />
-
-      {/* Pilihan role */}
-      <Text style={styles.label}>Pilih Peran</Text>
-
-      <View style={styles.roleContainer}>
-        {(['praktikan', 'asisten'] as const).map((item) => (
-          <Pressable
-            key={item}
-            disabled={loading}
-            style={[
-              styles.roleButton,
-              role === item && styles.roleSelected,
-            ]}
-            onPress={() => setRole(item)}
-          >
-            <Text
-              style={[
-                styles.roleText,
-                role === item && styles.roleTextSelected,
-              ]}
-            >
-              {item === 'praktikan' ? 'Praktikan' : 'Asisten'}
-            </Text>
-          </Pressable>
-        ))}
+      <View style={{ gap: 8 }}>
+        <Text style={styles.label}>Peran (boleh dua-duanya)</Text>
+        <View style={styles.chips}>
+          <PilihanChip label="Praktikan" aktif={peran.includes('praktikan')} onPress={() => togglePeran('praktikan')} disabled={loading} />
+          <PilihanChip label="Asisten" aktif={peran.includes('asisten')} onPress={() => togglePeran('asisten')} disabled={loading} />
+        </View>
+        {!!err.peran && <Text style={styles.error}>{err.peran}</Text>}
+        <Text style={styles.hint}>Pilih keduanya bila kamu praktikan di satu mata kuliah dan asisten di mata kuliah lain.</Text>
       </View>
 
-      {/* Tombol daftar */}
-      <Pressable
-        style={[
-          styles.submitButton,
-          loading && styles.disabledButton,
-        ]}
-        onPress={handleRegister}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.submitText}>Daftar</Text>
-        )}
-      </Pressable>
+      {peran.includes('praktikan') && (
+        <FieldInput label="Kelas (opsional)" value={kelas} onChangeText={setKelas} placeholder="IF-2B" autoCapitalize="characters" editable={!loading} hint="Bisa dikosongkan; aslab dapat mengisinya saat distribusi laboratorium." />
+      )}
+      {peran.includes('asisten') && (
+        <FieldInput label="Kode Verifikasi Asisten" value={kode} onChangeText={setKode} placeholder="Kode dari aslab" secure error={err.kode} editable={!loading} hint="Minta kode ini ke koordinator aslab. Tanpa kode yang benar, pendaftaran asisten ditolak." />
+      )}
 
-      {/* Navigasi ke halaman login */}
-      <View style={styles.loginContainer}>
-        <Text style={styles.loginText}>
-          Sudah punya akun?{' '}
-        </Text>
-
+      <Button label={loading ? 'Mendaftarkan...' : 'Daftar'} onPress={daftar} disabled={loading} />
+      <View style={styles.baris}>
+        <Text style={styles.sub}>Sudah punya akun? </Text>
         <Link href="/login" asChild>
           <Pressable disabled={loading}>
-            <Text style={styles.loginLink}>
-              Masuk di sini
-            </Text>
+            <Text style={styles.link}>Masuk di sini</Text>
           </Pressable>
         </Link>
       </View>
-    </View>
+    </AuthShell>
   );
 }
 
-// Styling halaman register
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    padding: 24,
-    justifyContent: 'center',
-  },
-
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#111827',
-  },
-
-  subtitle: {
-    color: '#6B7280',
-    marginTop: 8,
-    marginBottom: 28,
-  },
-
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-    marginTop: 14,
-  },
-
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 14,
-  },
-
-  roleContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-
-  roleButton: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-  },
-
-  roleSelected: {
-    backgroundColor: '#3730A3',
-    borderColor: '#3730A3',
-  },
-
-  roleText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-
-  roleTextSelected: {
-    color: '#FFFFFF',
-  },
-
-  submitButton: {
-    backgroundColor: '#3730A3',
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  submitText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-
-  loginText: {
-    color: '#6B7280',
-    fontSize: 14,
-  },
-
-  loginLink: {
-    color: '#3730A3',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  label: { fontSize: 13, fontWeight: '700', color: W.text },
+  chips: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  error: { fontSize: 12, color: W.red, fontWeight: '600' },
+  hint: { fontSize: 12, color: W.sub, lineHeight: 17 },
+  baris: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  sub: { color: W.sub, fontSize: 14 },
+  link: { color: W.blue, fontWeight: '700', fontSize: 14 },
 });

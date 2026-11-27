@@ -9,7 +9,7 @@ import { AksiSesi } from '../../../components/AksiSesi';
 import { RekapList } from '../../../components/RekapList';
 import { DaftarIzinAsisten } from '../../../components/DaftarIzinAsisten';
 import { EmptyState } from '../../../components/EmptyState';
-import { useRekapSesi, useSesi } from '../../../constants/dummy';
+import { useRekapSesi, useSesi } from '../../../constants/sesiStore';
 import { useDaftarIzinAsisten } from '../../../constants/izinStore';
 import { formatJamRentang, formatTanggalPanjang } from '../../../constants/format';
 import { MAX_W, W } from '../../../constants/warna';
