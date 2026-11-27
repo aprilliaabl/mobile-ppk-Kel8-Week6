@@ -34,9 +34,10 @@
       [
         "./plugins/withFirebaseBom",
         {
-          "bom": "34.19.0"
+          "bom": "34.17.0"
         }
       ],
+      "./plugins/withKotlinGradlePluginVersion",
       "expo-router",
       [
         "expo-location",
@@ -53,7 +54,14 @@
         }
       ],
       "expo-notifications",
-      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.2.20"
+          }
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "expo-sharing"
