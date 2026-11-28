@@ -15,7 +15,7 @@ export default function AsistenLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: W.bg }}>
-      <BannerKondisiPerangkat />
+      <BannerKondisiPerangkat periksaLokasi={false} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: W.bg } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="sesi/[id]" />

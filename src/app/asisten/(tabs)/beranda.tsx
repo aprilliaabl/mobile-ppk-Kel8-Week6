@@ -1,16 +1,15 @@
 import { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { JadwalList } from '../../../features/session/components/JadwalList';
-import { HeaderCard, StatBox } from '../../../components/HeaderCard';
+import { StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { FormSesi } from '../../../components/FormSesi';
 import { JadwalLaboratoriumSection } from '../../../components/JadwalLaboratoriumSection';
+import { Lipat, RingkasStat } from '../../../components/Ringkas';
 import { tambahSesi, useSesiList } from '../../../constants/sesiStore';
-import { useCurrentUser } from '../../../hooks/use-current-user';
 import { W } from '../../../constants/warna';
+import { JadwalList } from '../../../features/session/components/JadwalList';
 
-export default function BerandaAsisten() {
-  const asisten = useCurrentUser('asisten');
+/** Tab Jadwal asisten: ringkasan satu baris, tombol tambah sesi, status per lab (dilipat), lalu daftar sesi. */
+export default function JadwalAsisten() {
   const sesiList = useSesiList();
   const [formOpen, setFormOpen] = useState(false);
   const hitung = (s: string) => sesiList.filter((x) => x.status === s).length;
@@ -19,19 +18,20 @@ export default function BerandaAsisten() {
     <>
       <JadwalList
         role="asisten"
+        judul="Daftar Sesi"
         header={
-          <View>
-            <HeaderCard badge="ASISTEN" title={`Halo, ${asisten.nama}`} subtitle="Kelola sesi praktikum dan pantau kehadiran praktikan">
-              <View style={styles.stats}>
-                <StatBox label="Dibuka" value={hitung('dibuka')} color={W.green} />
-                <StatBox label="Belum dibuka" value={hitung('belum_dibuka')} />
-                <StatBox label="Selesai" value={hitung('ditutup')} color={W.red} />
-              </View>
-              <View style={{ marginTop: 12 }}>
-                <Button label="+ Tambah Sesi" onPress={() => setFormOpen(true)} />
-              </View>
-            </HeaderCard>
-            <JadwalLaboratoriumSection daftarSesi={sesiList} role="asisten" />
+          <View style={styles.header}>
+            <RingkasStat
+              items={[
+                { label: 'Dibuka', value: hitung('dibuka'), color: W.green },
+                { label: 'Belum dibuka', value: hitung('belum_dibuka') },
+                { label: 'Selesai', value: hitung('ditutup'), color: W.red },
+              ]}
+            />
+            <Button label="+ Tambah Sesi" onPress={() => setFormOpen(true)} />
+            <Lipat judul="Status per laboratorium" info="berlangsung & berikutnya">
+              <JadwalLaboratoriumSection daftarSesi={sesiList} role="asisten" />
+            </Lipat>
           </View>
         }
       />
@@ -41,5 +41,5 @@ export default function BerandaAsisten() {
 }
 
 const styles = StyleSheet.create({
-  stats: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  header: { gap: 10 },
 });

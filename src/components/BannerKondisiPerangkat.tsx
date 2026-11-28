@@ -16,7 +16,7 @@ interface Kondisi {
  * FR-23: banner yang menjelaskan kondisi perangkat yang menghambat fitur —
  * offline, izin notifikasi ditolak, izin lokasi ditolak, atau GPS mati.
  */
-export function BannerKondisiPerangkat() {
+export function BannerKondisiPerangkat({ periksaLokasi = true }: { periksaLokasi?: boolean }) {
   const [k, setK] = useState<Kondisi>({ offline: false, notifikasiMati: false, lokasiDitolak: false, gpsMati: false });
 
   const periksa = useCallback(async () => {
@@ -30,13 +30,13 @@ export function BannerKondisiPerangkat() {
       setK({
         offline: !net.isConnected || net.isInternetReachable === false,
         notifikasiMati: !notif,
-        lokasiDitolak: !izinLokasi.granted,
-        gpsMati: izinLokasi.granted && !gps,
+        lokasiDitolak: periksaLokasi && !izinLokasi.granted,
+        gpsMati: periksaLokasi && izinLokasi.granted && !gps,
       });
     } catch {
       // Pemeriksaan kondisi tidak boleh mengganggu aplikasi.
     }
-  }, []);
+  }, [periksaLokasi]);
 
   useEffect(() => {
     void periksa();

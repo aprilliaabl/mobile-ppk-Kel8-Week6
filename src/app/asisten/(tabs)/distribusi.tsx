@@ -37,7 +37,8 @@ const JENIS: { key: JenisImpor; label: string }[] = [
 ];
 
 /** FR-03 s.d. FR-06: distribusi anggota ke laboratorium dan impor massal (CSV) dengan tinjauan per baris. */
-export default function DistribusiAsisten() {
+/** `embedded`: dipakai di dalam tab Kelola, yang sudah menangani area aman bagian atas. */
+export function DistribusiPanel({ embedded = false }: { embedded?: boolean }) {
   const insets = useSafeAreaInsets();
   const labs = useLaboratoriumList();
   const { anggota, loading, error } = useSemuaAnggota();
@@ -63,7 +64,7 @@ export default function DistribusiAsisten() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: W.bg }}
-      contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 28 }]}
+      contentContainerStyle={[styles.scroll, { paddingTop: embedded ? 8 : insets.top + 16, paddingBottom: insets.bottom + 28 }]}
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.inner}>
@@ -107,6 +108,10 @@ export default function DistribusiAsisten() {
       </View>
     </ScrollView>
   );
+}
+
+export default function DistribusiAsisten() {
+  return <DistribusiPanel />;
 }
 
 /* ====================== DAFTAR ANGGOTA (FR-04) ====================== */

@@ -94,7 +94,7 @@ export function JadwalList({ role, header, statusTetap, judul = 'Jadwal Praktiku
       style={{ backgroundColor: W.bg }}
       contentContainerStyle={[
         styles.list,
-        { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 28 },
+        { paddingTop: insets.top + 14, paddingBottom: 20 },
       ]}
       ListHeaderComponent={
         <View style={styles.headerWrap}>
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   headerWrap: { paddingHorizontal: 6, marginBottom: 6 },
   offline: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderRadius: 12, padding: 12, marginTop: 14 },
   offlineText: { fontSize: 13, color: W.amber, fontWeight: '600', lineHeight: 19 },
-  section: { fontSize: 18, fontWeight: '800', color: W.text, marginTop: 22, marginBottom: 12 },
+  section: { fontSize: 16, fontWeight: '800', color: W.text, marginTop: 16, marginBottom: 8 },
   chips: { gap: 8, paddingBottom: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: W.card, borderWidth: 1, borderColor: W.line },
   chipAktif: { backgroundColor: W.blue, borderColor: W.blue },
@@ -177,13 +177,13 @@ const styles = StyleSheet.create({
   chipTextAktif: { color: '#FFFFFF' },
   card: { flexDirection: 'row', backgroundColor: W.card, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: W.line },
   accent: { width: 5 },
-  body: { flex: 1, padding: 16, gap: 12 },
+  body: { flex: 1, padding: 14, gap: 8 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   left: { flex: 1 },
   nama: { fontSize: 16, fontWeight: '800', color: W.text },
   kelas: { fontSize: 13, color: W.sub, marginTop: 3 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontSize: 13, color: W.sub, flexShrink: 1 },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: W.line, paddingTop: 12 },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: W.line, paddingTop: 8 },
   footerText: { fontSize: 13, fontWeight: '700' },
 });
