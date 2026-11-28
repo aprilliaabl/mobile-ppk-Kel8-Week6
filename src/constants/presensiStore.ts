@@ -37,8 +37,14 @@ export interface CatatanPresensi {
   waktuKehadiran: string; // contoh: "08.10.25"
   createdAtIso?: string;
   status: 'HADIR';
+<<<<<<< HEAD
   /** ID laboratorium tempat presensi dilakukan (FR-18). */
   labId?: string;
+=======
+  statusKetepatan?: 'TEPAT_WAKTU' | 'TERLAMBAT';
+  menitKeterlambatan?: number;
+  tagihanDendaId?: string;
+>>>>>>> origin/main
   lokasi?: InfoLokasiPresensi;
   /** Jarak perangkat ke laboratorium saat presensi (meter). */
   jarakMeter?: number;
@@ -70,10 +76,17 @@ export function formatTanggalPresensi(d: Date): string {
   return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN_PENDEK[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+<<<<<<< HEAD
 // Cache dalam memori yang disinkronkan dari Firestore secara real-time
 export const presensiStore: CatatanPresensi[] = [];
 
 let presensiSnapshot: CatatanPresensi[] = [...presensiStore];
+=======
+// Data presensi tidak di-seed dari kode. Snapshot awal kosong dan diisi listener Firestore.
+export const presensiStore: CatatanPresensi[] = [];
+
+let presensiSnapshot: CatatanPresensi[] = [];
+>>>>>>> origin/main
 const listeners = new Set<() => void>();
 const inFlightKeys = new Set<string>();
 
@@ -96,9 +109,33 @@ export function getPresensiSnapshot(): CatatanPresensi[] {
 /** Galat dengan pesan yang siap ditampilkan ke praktikan. */
 class GalatPresensi extends Error {}
 
+<<<<<<< HEAD
 /** Firestore menolak nilai `undefined`, jadi field kosong dibuang sebelum disimpan. */
 function bersihkan<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+=======
+  const docId = buatIdPresensi(data.sesiId, data.praktikanId);
+  const sudahAda = presensiStore.some(
+    (p) =>
+      buatIdPresensi(p.sesiId, p.praktikanId) === docId ||
+      (p.sesiId === data.sesiId && p.praktikanId === data.praktikanId)
+  );
+  if (sudahAda) {
+    return { ok: false, error: 'Kamu sudah melakukan presensi pada sesi ini.' };
+  }
+
+  const record: CatatanPresensi = {
+    ...data,
+    id: docId,
+    nimPraktikan: data.nimPraktikan,
+    createdAtIso: data.createdAtIso ?? new Date().toISOString(),
+    status: 'HADIR',
+  };
+
+  presensiStore.unshift(record);
+  emitPresensi();
+  return { ok: true, data: record };
+>>>>>>> origin/main
 }
 
 /**
@@ -146,6 +183,7 @@ export async function submitPresensi(params: {
   try {
     const firestoreDb = db;
     const now = new Date();
+<<<<<<< HEAD
     let hasil!: CatatanPresensi;
 
     await runTransaction(firestoreDb, async (tx) => {
@@ -190,6 +228,53 @@ export async function submitPresensi(params: {
         }
       } else if (requireLokasi) {
         throw new GalatPresensi('Sesi ini belum dikaitkan dengan laboratorium, sehingga lokasi tidak dapat diperiksa.');
+=======
+    // FR-14 & FR-15: Hitung status keterlambatan berdasarkan waktu mulai sesi & grace period
+    const { hitungStatusKeterlambatan, buatTagihanDenda } = await import('./dendaStore');
+    const validasiLate = hitungStatusKeterlambatan(sesi, now);
+    const statusKetepatan = validasiLate.isTerlambat ? 'TERLAMBAT' : 'TEPAT_WAKTU';
+
+    const record: CatatanPresensi = {
+      id: docId,
+      sesiId: sesi.id,
+      namaSesi: sesi.nama,
+      kelas: sesi.kelas,
+      praktikanId: effectivePraktikanId,
+      namaPraktikan: praktikan.nama,
+      nimPraktikan: praktikan.nim,
+      tanggal: formatTanggalPresensi(now),
+      waktuKehadiran: formatJamPresensi(now),
+      createdAtIso: now.toISOString(),
+      status: 'HADIR',
+      statusKetepatan,
+      menitKeterlambatan: validasiLate.menitKeterlambatan,
+      ...(lokasi ? { lokasi } : {}),
+    };
+
+    // FR-15: Jika terlambat, buat tagihan denda otomatis (idempotent, anti tagihan ganda)
+    if (validasiLate.isTerlambat) {
+      try {
+        const tagihan = await buatTagihanDenda({
+          sesi,
+          praktikanId: effectivePraktikanId,
+          namaPraktikan: praktikan.nama,
+          nimPraktikan: praktikan.nim,
+          presensiId: docId,
+          menitKeterlambatan: validasiLate.menitKeterlambatan,
+          nominal: validasiLate.nominalDenda,
+        });
+        record.tagihanDendaId = tagihan.id;
+      } catch (tagihanErr) {
+        console.warn('[Presensi] Gagal membuat tagihan denda otomatis:', tagihanErr);
+      }
+    }
+
+    // Tulis ke Firestore apabila Firebase aktif dan sesi ini bukan data demo lokal (atau user sedang login Firebase)
+    const isDemoLocalSesi = /^s-\d+$/.test(sesi.id);
+    if (isFirebaseConfigured && db && (auth?.currentUser || !isDemoLocalSesi)) {
+      if (!auth?.currentUser) {
+        throw new Error('UNAUTHENTICATED');
+>>>>>>> origin/main
       }
 
       const mulai = new Date(String(dataSesi.waktuMulai));
@@ -330,8 +415,12 @@ export function useRiwayatPraktikan(praktikanId: string): CatatanPresensi[] {
   return list.filter((p) => p.praktikanId === praktikanId);
 }
 
+<<<<<<< HEAD
 /** Mengosongkan cache lokal (dipanggil saat logout agar data pengguna lain tidak tersisa). */
 export function bersihkanPresensiLokal() {
+=======
+export function resetPresensiDemo() {
+>>>>>>> origin/main
   presensiStore.splice(0, presensiStore.length);
   emitPresensi();
 }

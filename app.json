@@ -11,6 +11,8 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.informatika.ppkkelompok8",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -22,9 +24,13 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+<<<<<<< HEAD
       "predictiveBackGestureEnabled": false,
       "package": "com.informatika.ppkkelompok8",
       "googleServicesFile": "./google-services.json"
+=======
+      "predictiveBackGestureEnabled": false
+>>>>>>> origin/main
     },
     "web": {
       "output": "static",

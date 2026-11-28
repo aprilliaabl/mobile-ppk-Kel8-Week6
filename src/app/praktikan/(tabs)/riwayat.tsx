@@ -5,12 +5,13 @@ import { EmptyState } from '../../../components/EmptyState';
 import { useCurrentUser } from '../../../hooks/use-current-user';
 import { useRiwayatPraktikan } from '../../../constants/presensiStore';
 import { useRiwayatIzinPraktikan } from '../../../constants/izinStore';
-import type { StatusIzin } from '../../../constants/types';
+import { useTagihanPraktikan } from '../../../constants/dendaStore';
+import type { StatusIzin, StatusTagihanDenda } from '../../../constants/types';
 import { MAX_W, W } from '../../../constants/warna';
 
 function badgeIzin(status: StatusIzin) {
   if (status === 'disetujui') {
-    return { bg: W.greenSoft, fg: W.green, label: '● DISETUJUI' };
+    return { bg: W.greenSoft, fg: W.green, label: '● DISETUJUI (BEBAS DENDA)' };
   }
   if (status === 'ditolak') {
     return { bg: W.redSoft, fg: W.red, label: '● DITOLAK' };
@@ -18,7 +19,20 @@ function badgeIzin(status: StatusIzin) {
   return { bg: 'rgba(245,158,11,0.16)', fg: W.amber, label: '● MENUNGGU' };
 }
 
-/** FR-09 & FR-14: Catatan kehadiran dan pemantauan status pengajuan izin real-time milik praktikan. */
+function badgeTagihan(status: StatusTagihanDenda) {
+  if (status === 'LUNAS') {
+    return { bg: W.greenSoft, fg: W.green, label: '● LUNAS' };
+  }
+  if (status === 'DIBEBASKAN') {
+    return { bg: 'rgba(147, 51, 234, 0.16)', fg: '#9333EA', label: '● DIBEBASKAN (IZIN)' };
+  }
+  if (status === 'PENDING') {
+    return { bg: 'rgba(245,158,11,0.16)', fg: W.amber, label: '● MEMPROSES PEMBAYARAN' };
+  }
+  return { bg: W.redSoft, fg: W.red, label: '● BELUM DIBAYAR' };
+}
+
+/** FR-09, FR-14, FR-15, FR-16: Catatan kehadiran, denda keterlambatan, dan pembebasan denda izin. */
 export default function RiwayatPraktikan() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -27,6 +41,11 @@ export default function RiwayatPraktikan() {
   const praktikan = useCurrentUser('praktikan');
   const riwayat = useRiwayatPraktikan(praktikan.id);
   const daftarIzin = useRiwayatIzinPraktikan(praktikan.id);
+  const daftarTagihan = useTagihanPraktikan(praktikan.id);
+
+  const totalDendaBelumDibayar = daftarTagihan
+    .filter((t) => t.status === 'BELUM_DIBAYAR')
+    .reduce((acc, curr) => acc + curr.nominal, 0);
 
   return (
     <ScrollView
@@ -34,12 +53,46 @@ export default function RiwayatPraktikan() {
       contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 28 }]}
     >
       <View style={styles.inner}>
-        <HeaderCard badge="PRAKTIKAN" title="Riwayat & Status Izin" subtitle={`${praktikan.nama} • pantau kehadiran dan pengajuan izinmu secara real-time`}>
+        <HeaderCard badge="PRAKTIKAN" title="Riwayat, Izin & Denda" subtitle={`${praktikan.nama} • pantau kehadiran, pengajuan izin, dan tagihan denda`}>
           <View style={styles.stats}>
-            <StatBox label="Total kehadiran" value={riwayat.length} color={W.green} />
-            <StatBox label="Pengajuan izin" value={daftarIzin.length} color={W.amber} />
+            <StatBox label="Total hadir" value={riwayat.length} color={W.green} />
+            <StatBox label="Izin diajukan" value={daftarIzin.length} color={W.amber} />
+            <StatBox label="Denda tertunda" value={`Rp ${totalDendaBelumDibayar.toLocaleString('id-ID')}`} color={totalDendaBelumDibayar > 0 ? W.red : W.sub} />
           </View>
         </HeaderCard>
+
+        {/* Bagian Tagihan Denda Keterlambatan (FR-15 & FR-16) */}
+        <Text style={styles.sectionTitle}>Tagihan Denda Keterlambatan</Text>
+        {daftarTagihan.length === 0 ? (
+          <EmptyState
+            ikon="kosong"
+            judul="Tidak ada tagihan denda"
+            deskripsi="Selamat! Kamu selalu presensi tepat waktu dan tidak memiliki tunggakan denda keterlambatan."
+          />
+        ) : (
+          <View style={styles.grid}>
+            {daftarTagihan.map((tagihan) => {
+              const b = badgeTagihan(tagihan.status);
+              return (
+                <View key={tagihan.id} style={{ width: `${100 / cols}%`, padding: 6 }}>
+                  <View style={[styles.card, tagihan.status === 'BELUM_DIBAYAR' && { borderColor: W.red }]}>
+                    <View style={styles.top}>
+                      <Text style={styles.nama}>{tagihan.namaSesi}</Text>
+                      <View style={[styles.badge, { backgroundColor: b.bg }]}>
+                        <Text style={[styles.badgeText, { color: b.fg }]}>{b.label}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.divider} />
+                    <Row label="Nominal Denda" value={`Rp ${tagihan.nominal.toLocaleString('id-ID')}`} highlight />
+                    <Row label="Keterlambatan" value={`${tagihan.menitKeterlambatan} menit`} />
+                    <Row label="Tanggal Tagihan" value={tagihan.tanggalTagihan} />
+                    <Row label="Keterangan" value={tagihan.alasan} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Bagian Status Pengajuan Izin Real-Time (FR-14) */}
         <Text style={styles.sectionTitle}>Status Pengajuan Izin</Text>
@@ -93,6 +146,9 @@ export default function RiwayatPraktikan() {
                   <Row label="Kelas" value={item.kelas} />
                   <Row label="Tanggal" value={item.tanggal} />
                   <Row label="Waktu hadir" value={`${item.waktuKehadiran} WIB`} highlight />
+                  {item.statusKetepatan === 'TERLAMBAT' && !!item.menitKeterlambatan && (
+                    <Row label="Keterlambatan" value={`${item.menitKeterlambatan} menit (denda dibuat)`} highlight />
+                  )}
                 </View>
               </View>
             ))}

@@ -232,6 +232,18 @@ export async function prosesKeputusanIzin(params: {
     };
     izinStore[idx] = updated;
     emitIzin();
+
+    // FR-16: Permission & Fine Exemption
+    // Jika izin disetujui Asprak, bebaskan denda praktikan untuk sesi tersebut (excused absence)
+    if (keputusan === 'disetujui') {
+      try {
+        const { bebaskanDendaKarenaIzin } = await import('./dendaStore');
+        await bebaskanDendaKarenaIzin(target.sesiId, target.praktikanId);
+      } catch (dendaErr) {
+        console.warn('[Izin] Gagal membebaskan denda izin disetujui:', dendaErr);
+      }
+    }
+
     return { ok: true, data: updated };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : '';
