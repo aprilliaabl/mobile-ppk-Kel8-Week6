@@ -24,13 +24,9 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-<<<<<<< HEAD
       "predictiveBackGestureEnabled": false,
       "package": "com.informatika.ppkkelompok8",
       "googleServicesFile": "./google-services.json"
-=======
-      "predictiveBackGestureEnabled": false
->>>>>>> origin/main
     },
     "web": {
       "output": "static",
