@@ -13,7 +13,8 @@ import {
 import type { DataLaboratorium, Laboratorium } from '../../../constants/types';
 import { W } from '../../../constants/warna';
 
-export default function KelolaLaboratoriumScreen() {
+/** `embedded`: dipakai di dalam tab Kelola, yang sudah menangani area aman bagian atas. */
+export function LaboratoriumPanel({ embedded = false }: { embedded?: boolean }) {
   const insets = useSafeAreaInsets();
   const labList = useLaboratoriumList();
 
@@ -60,7 +61,7 @@ export default function KelolaLaboratoriumScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+    <View style={[styles.container, { paddingTop: embedded ? 8 : insets.top + 16 }]}>
       <FlatList
         data={labList}
         keyExtractor={(item) => item.id}
@@ -204,3 +205,8 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: { color: W.red, fontSize: 13, fontWeight: '700' },
 });
+
+
+export default function KelolaLaboratoriumScreen() {
+  return <LaboratoriumPanel />;
+}

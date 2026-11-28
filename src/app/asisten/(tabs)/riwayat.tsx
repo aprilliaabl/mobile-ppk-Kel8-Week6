@@ -1,7 +1,7 @@
 import { View, StyleSheet } from 'react-native';
 import { JadwalList } from '../../../features/session/components/JadwalList';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
-import { getRekapSesi, useSesiList } from '../../../constants/dummy';
+import { getRekapSesi, useSesiList } from '../../../constants/sesiStore';
 import { useRefreshOnFocus } from '../../../hooks/use-refresh-on-focus';
 import { W } from '../../../constants/warna';
 

@@ -3,224 +3,273 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Memastikan pengguna sudah terautentikasi.
+    // ------------------------------------------------------------------
+    // Fungsi bantu
+    // ------------------------------------------------------------------
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Memastikan dokumen profil pengguna tersedia dan akunnya aktif.
-    function isActiveUser() {
-      return isAuthenticated()
-        && exists(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        )
-        && get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.accountStatus == 'active';
+    function profilSaya() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    // Pemeriksaan hak akses berdasarkan role dan status akun.
+    // Mendukung dokumen lama yang hanya memiliki field `role` dan dokumen baru dengan `roles` (daftar).
+    function daftarRole(d) {
+      return (('roles' in d) && d.roles is list) ? d.roles : [d.get('role', 'praktikan')];
+    }
+
+    // Dokumen profil ada dan akun aktif.
+    function isActiveUser() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && profilSaya().accountStatus == 'active';
+    }
+
+    // Satu akun boleh memiliki dua peran, jadi pemeriksaan memakai "mengandung", bukan "sama dengan".
     function isAsisten() {
-      return isActiveUser()
-        && get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.role == 'asisten';
+      return isActiveUser() && ('asisten' in daftarRole(profilSaya()));
     }
 
     function isPraktikan() {
-      return isActiveUser()
-        && get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.role == 'praktikan';
+      return isActiveUser() && ('praktikan' in daftarRole(profilSaya()));
     }
 
-    // FR-01 dan FR-02: Pengelolaan profil dan otorisasi pengguna.
+    // Jarak (meter) antara dua titik. Pendekatan ekuirektangular dengan cos dari deret Taylor,
+    // cukup akurat untuk jarak di bawah beberapa kilometer. Rules tidak punya fungsi trigonometri.
+    function jarakMeter(lat1, lng1, lat2, lng2) {
+      let rad = 0.017453292519943295;
+      let dLat = (lat2 - lat1) * rad;
+      let latTengah = ((lat1 + lat2) / 2) * rad;
+      let cosLat = 1 - math.pow(latTengah, 2) / 2 + math.pow(latTengah, 4) / 24 - math.pow(latTengah, 6) / 720;
+      let dLng = (lng2 - lng1) * rad * cosLat;
+      return 6371000 * math.sqrt(dLat * dLat + dLng * dLng);
+    }
+
+    // ------------------------------------------------------------------
+    // Konfigurasi sistem (mis. kode verifikasi asisten): tidak dapat dibaca/ditulis dari aplikasi.
+    // Rules lain tetap dapat memakai get() untuk membandingkan nilainya.
+    // ------------------------------------------------------------------
+    match /config/{docId} {
+      allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // Indeks NIM: satu NIM hanya dapat didaftarkan satu akun. Dibuat saat registrasi, tidak dapat diubah.
+    // ------------------------------------------------------------------
+    match /nimIndex/{nimKey} {
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly(['uid', 'nim', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.nim is string;
+      allow read, update, delete: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // FR-01 s.d. FR-03 (Sprint 2) dan SRS 2: profil pengguna
+    // ------------------------------------------------------------------
     match /users/{userId} {
 
-      // Pengguna dapat membaca profil sendiri.
-      // Asisten aktif dapat membaca profil pengguna untuk operasional.
       allow get: if isAuthenticated()
         && (request.auth.uid == userId || isAsisten());
 
-      // Hanya Asisten aktif yang dapat membaca daftar pengguna.
+      // Aslab membutuhkan daftar akun untuk memasukkan anggota ke laboratorium berdasarkan NIM.
       allow list: if isAsisten();
 
-      // Registrasi akun baru oleh pengguna terautentikasi.
+      // Registrasi: peran boleh praktikan, asisten, atau keduanya. Peran asisten hanya diterima
+      // bila kode verifikasi yang dikirim sama dengan config/registrasi.kodeAsisten.
       allow create: if isAuthenticated()
         && request.auth.uid == userId
-        && request.resource.data.keys().hasAll([
-          'uid',
-          'nama',
-          'email',
-          'role',
-          'requestedRole',
-          'accountStatus',
-          'createdAt'
-        ])
-        && request.resource.data.keys().hasOnly([
-          'uid',
-          'nama',
-          'email',
-          'nim',
-          'kelas',
-          'role',
-          'requestedRole',
-          'accountStatus',
-          'createdAt'
-        ])
+        && request.resource.data.keys().hasAll(['uid', 'nama', 'nim', 'email', 'roles', 'accountStatus', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'nama', 'nim', 'email', 'kelas', 'roles', 'accountStatus', 'kodeAsisten', 'createdAt'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.nama is string
-        && request.resource.data.nama.size() > 0
+        && request.resource.data.nama.size() >= 3
         && request.resource.data.nama.size() <= 100
+        && request.resource.data.nim is string
+        && request.resource.data.nim.size() >= 5
+        && request.resource.data.nim.size() <= 24
         && request.resource.data.email is string
-        && request.resource.data.email.size() > 0
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.role == 'praktikan'
-        && request.resource.data.requestedRole in [
-          'praktikan',
-          'asisten'
-        ]
+        && request.resource.data.email == request.auth.token.email.lower()
+        && request.resource.data.accountStatus == 'active'
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.accountStatus == (request.resource.data.requestedRole == 'asisten' ? 'pending' : 'active');
+        && request.resource.data.roles is list
+        && request.resource.data.roles.size() >= 1
+        && request.resource.data.roles.size() <= 2
+        && request.resource.data.roles.hasOnly(['praktikan', 'asisten'])
+        && (
+          !('asisten' in request.resource.data.roles)
+          || (
+            ('kodeAsisten' in request.resource.data)
+            && exists(/databases/$(database)/documents/config/registrasi)
+            && request.resource.data.kodeAsisten
+              == get(/databases/$(database)/documents/config/registrasi).data.kodeAsisten
+          )
+        )
+        // NIM harus sudah diklaim lewat nimIndex pada batch yang sama (create-only, sehingga unik).
+        && existsAfter(/databases/$(database)/documents/nimIndex/$(request.resource.data.nim.lower().replace('/', '-')))
+        && getAfter(/databases/$(database)/documents/nimIndex/$(request.resource.data.nim.lower().replace('/', '-'))).data.uid == request.auth.uid;
 
-      // Pengguna tidak boleh mengubah identitas dan hak aksesnya sendiri.
+      // Pengguna hanya boleh mengubah nama dan kelas. Peran, NIM, email, dan status tidak dapat diubah sendiri.
       allow update: if isAuthenticated()
         && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data)
-          .affectedKeys()
-          .hasAny([
-            'uid',
-            'email',
-            'role',
-            'requestedRole',
-            'accountStatus',
-            'createdAt'
-          ]);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nama', 'kelas', 'updatedAt'])
+        && request.resource.data.nama is string
+        && request.resource.data.nama.size() >= 3
+        && request.resource.data.nama.size() <= 100;
 
-      // Profil tidak boleh dihapus melalui aplikasi.
       allow delete: if false;
 
-      // FR-22: Pengelolaan token FCM milik pengguna.
+      // FR-22: token FCM milik pengguna
       match /fcmTokens/{tokenId} {
-
-        // Pengguna hanya dapat mendaftarkan atau memperbarui
-        // token milik akunnya sendiri.
         allow create, update: if isActiveUser()
           && request.auth.uid == userId
-          && request.resource.data.keys().hasAll([
-            'token',
-            'platform',
-            'updatedAt'
-          ])
-          && request.resource.data.keys().hasOnly([
-            'token',
-            'platform',
-            'updatedAt'
-          ])
+          && request.resource.data.keys().hasAll(['token', 'platform', 'updatedAt'])
+          && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
           && request.resource.data.token == tokenId
           && request.resource.data.token is string
           && request.resource.data.token.size() > 0
           && request.resource.data.token.size() <= 4096
-          && request.resource.data.platform in [
-            'android',
-            'ios'
-          ]
+          && request.resource.data.platform in ['android', 'ios']
           && request.resource.data.updatedAt is timestamp;
-
-        // Pengguna hanya dapat menghapus token milik akunnya sendiri.
-        allow delete: if isActiveUser()
-          && request.auth.uid == userId;
-
-        // Token tidak perlu dapat dibaca oleh pengguna lain.
+        allow delete: if isActiveUser() && request.auth.uid == userId;
         allow read: if false;
       }
     }
 
-    // FR-18 dan FR-21: Data master laboratorium beserta koordinat dan radius.
+    // ------------------------------------------------------------------
+    // FR-01, FR-02, FR-19: laboratorium (nama, lokasi, koordinat, radius, grace period)
+    // ------------------------------------------------------------------
     match /laboratorium/{labId} {
       allow read: if isActiveUser();
-      allow create, update, delete: if isAsisten();
-    }
 
-    // FR-04 dan FR terkait: Pengelolaan sesi praktikum.
-    match /sesi/{sesiId} {
-      allow read: if isActiveUser();
-      allow create, update, delete: if isAsisten();
-    }
-
-    // FR-07, FR-08, FR-17, dan FR-18: Presensi praktikan dengan validasi sesi dan radius lokasi.
-    match /presensi/{presensiId} {
-
-      allow read: if isAsisten()
-        || (
-          isPraktikan()
-          && resource.data.praktikanId == request.auth.uid
-        );
-
-      allow create: if isPraktikan()
-        && request.resource.data.praktikanId == request.auth.uid
-        && request.resource.data.sesiId is string
-        && presensiId == request.resource.data.sesiId
-          + '_'
-          + request.auth.uid
-        && !exists(
-          /databases/$(database)/documents/presensi/$(presensiId)
-        )
-        && get(
-          /databases/$(database)/documents/sesi/$(request.resource.data.sesiId)
-        ).data.status == 'dibuka'
-        && request.resource.data.status == 'HADIR'
+      allow create, update: if isAsisten()
+        && request.resource.data.nama is string
+        && request.resource.data.nama.size() > 0
+        && request.resource.data.nama.size() <= 100
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -90
+        && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180
+        && request.resource.data.longitude <= 180
+        && request.resource.data.radius is number
+        && request.resource.data.radius > 0
+        && request.resource.data.radius <= 1000
         && (
-          !('lokasi' in request.resource.data)
+          !('gracePeriodMinutes' in request.resource.data)
           || (
-            request.resource.data.lokasi is map
-            && request.resource.data.lokasi.latitude is number
-            && request.resource.data.lokasi.longitude is number
-            && request.resource.data.lokasi.jarakMeter is number
-            && request.resource.data.lokasi.radiusMeter is number
-            && request.resource.data.lokasi.jarakMeter
-              <= request.resource.data.lokasi.radiusMeter
+            request.resource.data.gracePeriodMinutes is number
+            && request.resource.data.gracePeriodMinutes >= 0
+            && request.resource.data.gracePeriodMinutes <= 120
           )
         );
 
-      // Presensi yang sudah dibuat tidak dapat diubah atau dihapus.
-      allow update, delete: if false;
+      allow delete: if isAsisten();
     }
 
-    // FR-11 sampai FR-14: Pengajuan izin dan persetujuan Asisten.
+    // ------------------------------------------------------------------
+    // FR-04 (SRS 2): keanggotaan praktikan dan asprak pada laboratorium.
+    // ID dokumen = laboratoriumId_userId, sehingga seseorang tidak dapat terdaftar ganda di satu lab.
+    // ------------------------------------------------------------------
+    match /laboratoriumAnggota/{anggotaId} {
+      allow read: if isAsisten()
+        || (isActiveUser() && resource.data.userId == request.auth.uid);
+
+      allow create, update: if isAsisten()
+        && request.resource.data.userId is string
+        && request.resource.data.laboratoriumId is string
+        && request.resource.data.role in ['praktikan', 'asisten']
+        && request.resource.data.nama is string
+        && request.resource.data.nim is string
+        && request.resource.data.kelas is string
+        && anggotaId == request.resource.data.laboratoriumId + '_' + request.resource.data.userId;
+
+      allow delete: if isAsisten();
+    }
+
+    // ------------------------------------------------------------------
+    // FR-04, FR-05, FR-06, FR-09 (Sprint 2): sesi praktikum
+    // ------------------------------------------------------------------
+    match /sesi/{sesiId} {
+      allow read: if isActiveUser();
+
+      allow create, update: if isAsisten()
+        && request.resource.data.nama is string
+        && request.resource.data.nama.size() > 0
+        && request.resource.data.kelas is string
+        && request.resource.data.status in ['belum_dibuka', 'dibuka', 'ditutup'];
+
+      allow delete: if isAsisten();
+    }
+
+    // ------------------------------------------------------------------
+    // FR-07, FR-08, FR-17, FR-18: presensi.
+    // Server memeriksa: sesi dibuka, belum pernah presensi, dan posisi berada di dalam radius lab
+    // (dihitung dari koordinat lab di Firestore, bukan dari angka kiriman aplikasi).
+    // ------------------------------------------------------------------
+    match /presensi/{presensiId} {
+
+      allow read: if isAsisten()
+        || (isActiveUser() && resource.data.praktikanId == request.auth.uid);
+
+      allow create: if isPraktikan()
+        && request.resource.data.keys().hasOnly([
+          'id', 'sesiId', 'namaSesi', 'kelas', 'praktikanId', 'namaPraktikan', 'nimPraktikan',
+          'tanggal', 'waktuKehadiran', 'createdAtIso', 'status', 'labId', 'lokasi', 'jarakMeter',
+          'terlambat', 'menitTerlambat', 'createdAt'
+        ])
+        && request.resource.data.praktikanId == request.auth.uid
+        && request.resource.data.sesiId is string
+        && presensiId == request.resource.data.sesiId + '_' + request.auth.uid
+        && request.resource.data.status == 'HADIR'
+        && get(/databases/$(database)/documents/sesi/$(request.resource.data.sesiId)).data.status == 'dibuka'
+        && get(/databases/$(database)/documents/sesi/$(request.resource.data.sesiId)).data.get('laboratoriumId', '') != ''
+        && request.resource.data.labId
+          == get(/databases/$(database)/documents/sesi/$(request.resource.data.sesiId)).data.laboratoriumId
+        && request.resource.data.lokasi is map
+        && request.resource.data.lokasi.latitude is number
+        && request.resource.data.lokasi.longitude is number
+        && jarakMeter(
+          request.resource.data.lokasi.latitude,
+          request.resource.data.lokasi.longitude,
+          get(/databases/$(database)/documents/laboratorium/$(request.resource.data.labId)).data.latitude,
+          get(/databases/$(database)/documents/laboratorium/$(request.resource.data.labId)).data.longitude
+        ) <= get(/databases/$(database)/documents/laboratorium/$(request.resource.data.labId)).data.radius + 1;
+
+      // Presensi tidak dapat diubah. Hanya asisten yang dapat menghapus (mis. koreksi data).
+      allow update: if false;
+      allow delete: if isAsisten();
+    }
+
+    // ------------------------------------------------------------------
+    // FR-11 s.d. FR-14: pengajuan izin dan keputusan asisten
+    // ------------------------------------------------------------------
     match /izin/{izinId} {
 
       allow read: if isAsisten()
-        || (
-          isPraktikan()
-          && resource.data.praktikanId == request.auth.uid
-        );
+        || (isActiveUser() && resource.data.praktikanId == request.auth.uid);
 
       allow create: if isPraktikan()
+        && request.resource.data.keys().hasOnly([
+          'id', 'sesiId', 'namaSesi', 'kelas', 'praktikanId', 'namaPraktikan', 'nimPraktikan',
+          'alasan', 'status', 'klasifikasiAI', 'tanggalPengajuan', 'waktuPengajuan', 'createdAtIso', 'createdAt'
+        ])
         && request.resource.data.praktikanId == request.auth.uid
         && request.resource.data.sesiId is string
         && request.resource.data.alasan is string
         && request.resource.data.alasan.size() > 0
+        && request.resource.data.alasan.size() <= 500
         && request.resource.data.status == 'pending'
-        && izinId == request.resource.data.sesiId
-          + '_'
-          + request.auth.uid
-        && !exists(
-          /databases/$(database)/documents/izin/$(izinId)
-        );
+        && izinId == request.resource.data.sesiId + '_' + request.auth.uid;
 
+      // Hanya asisten, hanya dari status pending, dan hanya field keputusan yang boleh berubah.
       allow update: if isAsisten()
         && resource.data.status == 'pending'
-        && request.resource.data.status in [
-          'disetujui',
-          'ditolak'
-        ]
-        && request.resource.data.praktikanId
-          == resource.data.praktikanId
-        && request.resource.data.sesiId
-          == resource.data.sesiId
-        && request.resource.data.alasan
-          == resource.data.alasan;
+        && request.resource.data.status in ['disetujui', 'ditolak']
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'diprosesOleh', 'diprosesPada', 'diprosesOlehId', 'updatedAt']);
 
       allow delete: if false;
     }

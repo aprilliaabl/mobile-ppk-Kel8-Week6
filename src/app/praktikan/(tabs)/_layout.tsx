@@ -2,9 +2,11 @@ import { Tabs } from 'expo-router/js-tabs';
 import { Ikon } from '../../../components/Ikon';
 import { W } from '../../../constants/warna';
 
+/** Empat tab utama. Peta dibuka lewat pintasan di Beranda. */
 export default function PraktikanTabs() {
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: W.blue,
@@ -14,11 +16,11 @@ export default function PraktikanTabs() {
         sceneStyle: { backgroundColor: W.bg },
       }}
     >
-      <Tabs.Screen name="beranda" options={{ title: 'Jadwal', tabBarIcon: ({ color }) => <Ikon nama="jadwal" color={color} size={24} /> }} />
+      <Tabs.Screen name="beranda" options={{ title: 'Beranda', tabBarIcon: ({ color }) => <Ikon nama="dashboard" color={color} size={24} /> }} />
       <Tabs.Screen name="presensi" options={{ title: 'Presensi', tabBarIcon: ({ color }) => <Ikon nama="presensi" color={color} size={24} /> }} />
-      <Tabs.Screen name="peta" options={{ title: 'Peta', tabBarIcon: ({ color }) => <Ikon nama="peta" color={color} size={24} /> }} />
       <Tabs.Screen name="riwayat" options={{ title: 'Riwayat', tabBarIcon: ({ color }) => <Ikon nama="riwayat" color={color} size={24} /> }} />
       <Tabs.Screen name="akun" options={{ title: 'Akun', tabBarIcon: ({ color }) => <Ikon nama="akun" color={color} size={24} /> }} />
+      <Tabs.Screen name="peta" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -1,6 +1,6 @@
 import { cariLaboratoriumSesi, hitungJarakMeter } from './laboratorium';
 import type { InfoLokasiPresensi } from './presensiStore';
-import type { Laboratorium, Sesi, UserDummy } from './types';
+import type { Laboratorium, Sesi, Pengguna } from './types';
 
 export type StatusLokasiPerangkat =
   | 'idle'
@@ -180,7 +180,7 @@ export function evaluasiLokasiTerhadapLab(params: {
  */
 export function validasiSyaratPresensi(params: {
   sesi: Sesi | undefined;
-  praktikan: UserDummy | undefined;
+  praktikan: Pengguna | undefined;
   sudahPresensi: boolean;
   waktuHadir?: string | null;
   statusLokasi: StatusLokasiPerangkat;

@@ -1,6 +1,5 @@
 
 import { useEffect } from 'react';
-import { Alert } from 'react-native';
 
 import { useAuth } from '../contexts/AuthContext';
 
@@ -35,23 +34,10 @@ export default function FCMInitializer() {
 
         unsubscribeToken = result.unsubscribeToken;
 
-        if (!result.permissionGranted) {
-          Alert.alert(
-            'Izin Notifikasi Belum Aktif',
-            'Aktifkan izin notifikasi melalui pengaturan aplikasi agar kamu dapat menerima informasi pembukaan sesi, perubahan jadwal, dan keputusan pengajuan izin.',
-            [{ text: 'Mengerti' }]
-          );
-        }
+        // Izin yang ditolak ditampilkan oleh BannerKondisiPerangkat (FR-23), bukan lewat dialog setiap login.
       } catch (error) {
         console.error('[FCM] Gagal melakukan registrasi:', error);
 
-        if (isActive) {
-          Alert.alert(
-            'Notifikasi Belum Tersedia',
-            'Registrasi notifikasi gagal. Periksa koneksi internet dan coba kembali.',
-            [{ text: 'Mengerti' }]
-          );
-        }
       }
     };
 

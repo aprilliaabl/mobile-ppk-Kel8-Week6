@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   KeyboardTypeOptions,
   ScrollView,
   StyleSheet,
@@ -31,6 +30,7 @@ interface FormValues {
   radius: string;
   gracePeriodMinutes: string;
   deskripsi: string;
+  mataKuliah: string;
 }
 
 export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: Props) {
@@ -45,9 +45,10 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
     lantai: '1',
     latitude: '-7.047909',
     longitude: '110.440866',
-    radius: '10',
+    radius: '25',
     gracePeriodMinutes: '15',
     deskripsi: '',
+    mataKuliah: '',
   });
 
   useEffect(() => {
@@ -62,21 +63,23 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
           lantai: String(laboratorium.lantai ?? 1),
           latitude: String(laboratorium.latitude),
           longitude: String(laboratorium.longitude),
-          radius: String(laboratorium.radius ?? 10),
+          radius: String(laboratorium.radius ?? 25),
           gracePeriodMinutes: String(laboratorium.gracePeriodMinutes ?? 15),
           deskripsi: laboratorium.deskripsi ?? '',
+          mataKuliah: laboratorium.mataKuliah ?? '',
         });
       } else {
         setForm({
           nama: '',
           kode: '',
-          gedung: 'Gedung E FSM Undip',
-          lantai: '2',
+          gedung: '',
+          lantai: '1',
           latitude: '-7.047909',
           longitude: '110.440866',
-          radius: '10',
+          radius: '25',
           gracePeriodMinutes: '15',
           deskripsi: '',
+          mataKuliah: '',
         });
       }
     }
@@ -91,37 +94,37 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
     const namaTrim = form.nama.trim();
     const kodeTrim = form.kode.trim().toUpperCase();
     const gedungTrim = form.gedung.trim();
-    const latNum = parseFloat(form.latitude);
-    const lonNum = parseFloat(form.longitude);
-    const radNum = parseFloat(form.radius);
+    const latNum = parseFloat(form.latitude.replace(',', '.'));
+    const lonNum = parseFloat(form.longitude.replace(',', '.'));
+    const radNum = parseFloat(form.radius.replace(',', '.'));
     const graceNum = parseInt(form.gracePeriodMinutes, 10);
 
     if (!namaTrim) {
-      Alert.alert('Peringatan', 'Nama laboratorium wajib diisi.');
+      setErrorMsg('Nama laboratorium wajib diisi.');
       return;
     }
     if (!kodeTrim) {
-      Alert.alert('Peringatan', 'Kode laboratorium wajib diisi (mis. LAB-01).');
+      setErrorMsg('Kode laboratorium wajib diisi (mis. LAB-01).');
       return;
     }
     if (!gedungTrim) {
-      Alert.alert('Peringatan', 'Nama gedung/lokasi wajib diisi.');
+      setErrorMsg('Nama gedung/lokasi wajib diisi.');
       return;
     }
     if (isNaN(latNum) || latNum < -90 || latNum > 90) {
-      Alert.alert('Peringatan', 'Latitude harus berupa angka antara -90 dan 90.');
+      setErrorMsg('Latitude harus berupa angka antara -90 dan 90.');
       return;
     }
     if (isNaN(lonNum) || lonNum < -180 || lonNum > 180) {
-      Alert.alert('Peringatan', 'Longitude harus berupa angka antara -180 dan 180.');
+      setErrorMsg('Longitude harus berupa angka antara -180 dan 180.');
       return;
     }
-    if (isNaN(radNum) || radNum <= 0) {
-      Alert.alert('Peringatan', 'Radius toleransi harus berupa angka lebih besar dari 0.');
+    if (isNaN(radNum) || radNum <= 0 || radNum > 1000) {
+      setErrorMsg('Radius presensi harus lebih dari 0 dan maksimal 1000 meter.');
       return;
     }
     if (isNaN(graceNum) || graceNum < 0 || graceNum > 120) {
-      Alert.alert('Peringatan', 'Grace period harus berupa angka 0–120 menit.');
+      setErrorMsg('Grace period harus berupa angka 0–120 menit.');
       return;
     }
 
@@ -139,6 +142,7 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
         radius: radNum,
         gracePeriodMinutes: graceNum,
         deskripsi: form.deskripsi.trim() || undefined,
+        mataKuliah: form.mataKuliah.trim() || undefined,
       };
 
       await onSubmit(payload);
@@ -210,9 +214,10 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
           })}
         </View>
 
+        <Text style={styles.seksi}>KONFIGURASI OPERASIONAL</Text>
         {Field({
           k: 'radius',
-          label: 'Radius Toleransi Presensi (Meter)',
+          label: 'Cakupan Lokasi Presensi / Radius (Meter)',
           placeholder: '25',
           keyboard: 'numeric',
         })}
@@ -224,11 +229,9 @@ export function FormLaboratorium({ visible, onClose, laboratorium, onSubmit }: P
           keyboard: 'numeric',
         })}
 
-        {Field({
-          k: 'deskripsi',
-          label: 'Deskripsi / Matakuliah yang Diajar',
-          placeholder: 'Praktikum Algoritma, Basis Data, dll.',
-        })}
+        <Text style={styles.seksi}>INFORMASI TAMBAHAN</Text>
+        {Field({ k: 'mataKuliah', label: 'Mata Kuliah', placeholder: 'Basis Data' })}
+        {Field({ k: 'deskripsi', label: 'Deskripsi', placeholder: 'Keterangan singkat laboratorium' })}
 
         {!!errorMsg && <Text style={styles.error}>{errorMsg}</Text>}
       </ScrollView>
@@ -252,5 +255,6 @@ const styles = StyleSheet.create({
     color: W.text,
     backgroundColor: W.bg,
   },
+  seksi: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: W.sub, marginTop: 4 },
   error: { fontSize: 13, color: W.red, fontWeight: '600' },
 });

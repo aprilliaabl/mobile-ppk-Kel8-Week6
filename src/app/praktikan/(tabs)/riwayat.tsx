@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderCard, StatBox } from '../../../components/HeaderCard';
 import { EmptyState } from '../../../components/EmptyState';
-import { useCurrentUser } from '../../../constants/dummy';
+import { useCurrentUser } from '../../../hooks/use-current-user';
 import { useRiwayatPraktikan } from '../../../constants/presensiStore';
 import { useRiwayatIzinPraktikan } from '../../../constants/izinStore';
 import { useTagihanPraktikan } from '../../../constants/dendaStore';

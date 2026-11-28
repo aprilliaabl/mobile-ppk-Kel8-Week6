@@ -24,13 +24,26 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+<<<<<<< HEAD
+      "predictiveBackGestureEnabled": false,
+      "package": "com.informatika.ppkkelompok8",
+      "googleServicesFile": "./google-services.json"
+=======
       "predictiveBackGestureEnabled": false
+>>>>>>> origin/main
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "./plugins/withFirebaseBom",
+        {
+          "bom": "34.17.0"
+        }
+      ],
+      "./plugins/withKotlinGradlePluginVersion",
       "expo-router",
       [
         "expo-location",
@@ -47,8 +60,17 @@
         }
       ],
       "expo-notifications",
-      "expo-build-properties",
-      "@react-native-firebase/app"
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.3.0"
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
